@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/11 20:56:31 +0000 $
-# $Revision: 1 $
-# $Snapshot: /Tie-Hash-Indexed/0.03 $
+# $Date: 2006/01/21 09:28:57 +0000 $
+# $Revision: 2 $
+# $Snapshot: /Tie-Hash-Indexed/0.04 $
 # $Source: /t/102_storable.t $
 #
 ################################################################################
@@ -25,6 +25,10 @@ ok(1);
 eval { require Storable; import Storable qw( dclone freeze thaw ) };
 if ($@) {
   for (2..$tests) { skip("skip: Storable not installed", 0, 1) }
+  exit;
+}
+if (eval $Storable::VERSION < 1.011) {
+  for (2..$tests) { skip("skip: Storable $Storable::VERSION is buggy", 0, 1) }
   exit;
 }
 

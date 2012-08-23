@@ -1,6 +1,6 @@
 /*******************************************************************************
 *
-* MODULE: C.xs
+* MODULE: Indexed.xs
 *
 ********************************************************************************
 *
@@ -10,9 +10,9 @@
 *
 * $Project: /Tie-Hash-Indexed $
 * $Author: mhx $
-* $Date: 2003/11/11 21:03:52 +0000 $
-* $Revision: 8 $
-* $Snapshot: /Tie-Hash-Indexed/0.03 $
+* $Date: 2006/01/21 09:27:48 +0000 $
+* $Revision: 12 $
+* $Snapshot: /Tie-Hash-Indexed/0.04 $
 * $Source: /Indexed.xs $
 *
 ********************************************************************************
@@ -26,9 +26,14 @@
 
 /*===== GLOBAL INCLUDES ======================================================*/
 
+#define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+
+#ifdef THI_DEBUGGING
+#define NEED_sv_2pv_nolen
+#endif
 
 #include "ppport.h"
 
@@ -189,9 +194,9 @@ static void set_debug_opt(pTHX_ const char *dbopts)
   else
   {
     gs_dbflags = 0;
-    while( *dbopts )
+    while (*dbopts)
     {
-      switch( *dbopts )
+      switch (*dbopts)
       {
         case 'd': gs_dbflags |= DB_THI_MAIN;  break;
         default:
@@ -225,7 +230,7 @@ TIEHASH(CLASS)
 	char *CLASS
 
 	PREINIT:
-		THI_METHOD( TIEHASH );
+		THI_METHOD(TIEHASH);
 
 	CODE:
 		THI_DEBUG_METHOD;
@@ -251,7 +256,7 @@ TIEHASH(CLASS)
 void
 IXHV::DESTROY()
 	PREINIT:
-		THI_METHOD( DESTROY );
+		THI_METHOD(DESTROY);
 		IxLink *cur;
 
 	CODE:
@@ -292,7 +297,7 @@ IXHV::FETCH(key)
 	SV *key
 
 	PREINIT:
-		THI_METHOD( FETCH );
+		THI_METHOD(FETCH);
 		HE *he;
 
 	PPCODE:
@@ -320,7 +325,7 @@ IXHV::STORE(key, value)
 	SV *value
 
 	PREINIT:
-		THI_METHOD( STORE );
+		THI_METHOD(STORE);
 		HE *he;
 
 	CODE:
@@ -354,7 +359,7 @@ IXHV::STORE(key, value)
 void
 IXHV::FIRSTKEY()
 	PREINIT:
-		THI_METHOD( FIRSTKEY );
+		THI_METHOD(FIRSTKEY);
 
 	PPCODE:
 		THI_DEBUG_METHOD;
@@ -382,7 +387,7 @@ IXHV::NEXTKEY(last)
 	SV *last
 
 	PREINIT:
-		THI_METHOD( NEXTKEY );
+		THI_METHOD(NEXTKEY);
 
 	PPCODE:
 		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(last));
@@ -410,7 +415,7 @@ IXHV::EXISTS(key)
 	SV *key
 
 	PREINIT:
-		THI_METHOD( EXISTS );
+		THI_METHOD(EXISTS);
 
 	PPCODE:
 		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
@@ -435,7 +440,7 @@ IXHV::DELETE(key)
 	SV *key
 
 	PREINIT:
-		THI_METHOD( DELETE );
+		THI_METHOD(DELETE);
 		IxLink *cur;
 		SV *sv;
 
@@ -444,13 +449,26 @@ IXHV::DELETE(key)
 		THI_CHECK_OBJECT;
 
 		if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
+		{
+		  THI_DEBUG(MAIN, ("key '%s' not found\n", SvPV_nolen(key)));
 		  XSRETURN_UNDEF;
+		}
 
 		cur = INT2PTR(IxLink *, SvIV(sv));
 		SvREFCNT_dec(cur->key);
 		sv = cur->val;
+
+		if (THIS->iter == cur)
+		{
+		  THI_DEBUG(MAIN, ("need to move current iterator %p -> %p\n",
+		                   THIS->iter, cur->prev));
+		  THIS->iter = cur->prev;
+		}
+
 		IxLink_extract(cur);
 		IxLink_delete(cur);
+
+		THI_DEBUG(MAIN, ("key '%s' deleted\n", SvPV_nolen(key)));
 
 		ST(0) = sv_2mortal(sv);
 		XSRETURN(1);
@@ -467,7 +485,7 @@ IXHV::DELETE(key)
 void
 IXHV::CLEAR()
 	PREINIT:
-		THI_METHOD( CLEAR );
+		THI_METHOD(CLEAR);
 		IxLink *cur;
 
 	PPCODE:
@@ -490,6 +508,35 @@ IXHV::CLEAR()
 
 ################################################################################
 #
+#   METHOD: SCALAR
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Jan 2004
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::SCALAR()
+	PREINIT:
+		THI_METHOD(SCALAR);
+
+	PPCODE:
+		THI_DEBUG_METHOD;
+		THI_CHECK_OBJECT;
+#ifdef hv_scalar
+		ST(0) = hv_scalar(THIS->hv);
+#else
+		ST(0) = sv_newmortal();
+		if (HvFILL(THIS->hv)) 
+		  Perl_sv_setpvf(aTHX_ ST(0), "%ld/%ld", (long)HvFILL(THIS->hv),
+		                                       (long)HvMAX(THIS->hv)+1);
+		else
+		  sv_setiv(ST(0), 0);
+#endif
+		XSRETURN(1);
+
+################################################################################
+#
 #   METHOD: STORABLE_freeze
 #
 #   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
@@ -502,7 +549,7 @@ IXHV::STORABLE_freeze(cloning)
 	int cloning;
 
 	PREINIT:
-		THI_METHOD( STORABLE_freeze );
+		THI_METHOD(STORABLE_freeze);
 		Serialized s;
 		IxLink *cur;
 		int n;
@@ -542,14 +589,14 @@ STORABLE_thaw(object, cloning, serialized, ...)
 	SV *serialized;
 
 	PREINIT:
-		THI_METHOD( STORABLE_thaw );
+		THI_METHOD(STORABLE_thaw);
 		IXHV *THIS;
 		Serialized *ps;
 		STRLEN len;
 		int i;
 
 	PPCODE:
-		THI_DEBUG_METHOD2("%d, '%s'", cloning, SvPV_nolen(serialized));
+		THI_DEBUG_METHOD1("%d", cloning);
 
 		if (!sv_isobject(object) || SvTYPE(SvRV(object)) != SVt_PVMG)
 		  Perl_croak(aTHX_ XSCLASS "::%s: THIS is not "
@@ -617,8 +664,8 @@ BOOT:
 #ifdef THI_DEBUGGING
 		{
 		  const char *str;
-		  if( (str = getenv("THI_DEBUG_OPT")) != NULL )
-		    set_debug_opt( aTHX_ str );
+		  if ((str = getenv("THI_DEBUG_OPT")) != NULL)
+		    set_debug_opt(aTHX_ str);
 		}
 #endif
 

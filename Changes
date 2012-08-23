@@ -1,6 +1,18 @@
-------------
-Version 0.03
-------------
+-------------------------
+Version 0.04 (2006-01-21)
+-------------------------
+
+* fixed: deleting the current item from the hash while
+  iterating with "each" caused segfaults or panics;
+  thanks to Cristian Cocheci for spotting this bug
+
+* added SCALAR method
+
+* minor improvements
+
+-------------------------
+Version 0.03 (2003-11-11)
+-------------------------
 
 * added Storable hooks to allow for serializing
   and cloning objects using Storable
@@ -9,15 +21,15 @@ Version 0.03
 
 * added debugging support
 
-------------
-Version 0.02
-------------
+-------------------------
+Version 0.02 (2003-11-03)
+-------------------------
 
 * extended compatibility back to perl 5.4.0
 
-------------
-Version 0.01
-------------
+-------------------------
+Version 0.01 (2003-11-02)
+-------------------------
 
 * initial release
 

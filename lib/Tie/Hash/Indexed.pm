@@ -4,7 +4,7 @@
 # $Author: mhx $
 # $Date: 2003/11/11 20:42:36 +0000 $
 # $Revision: 4 $
-# $Snapshot: /Tie-Hash-Indexed/0.03 $
+# $Snapshot: /Tie-Hash-Indexed/0.04 $
 # $Source: /lib/Tie/Hash/Indexed.pm $
 #
 ################################################################################
@@ -22,7 +22,7 @@ use Tie::Hash;
 use vars qw($VERSION @ISA);
 
 @ISA = qw(DynaLoader Tie::Hash);
-$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.03 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
+$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.04 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
 
 bootstrap Tie::Hash::Indexed $VERSION;
 

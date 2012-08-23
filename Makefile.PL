@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/05 21:11:26 +0000 $
-# $Revision: 4 $
-# $Snapshot: /Tie-Hash-Indexed/0.03 $
+# $Date: 2006/01/21 09:36:42 +0000 $
+# $Revision: 5 $
+# $Snapshot: /Tie-Hash-Indexed/0.04 $
 # $Source: /Makefile.PL $
 #
 ################################################################################
@@ -49,18 +49,24 @@ ENDUSAGE
   $myopt ? () : $_
 } @ARGV;
 
+if (eval $ExtUtils::MakeMaker::VERSION >= 6) {
+  push @moreopts, AUTHOR => 'Marcus Holland-Moritz <mhx@cpan.org>',
+                  ABSTRACT_FROM => 'lib/Tie/Hash/Indexed.pm';
+}
+
+if (eval $ExtUtils::MakeMaker::VERSION >= 6.30_01) {
+  print "Setting license tag...\n";
+  push @moreopts, LICENSE => 'perl';
+}
+
 WriteMakefile(
   NAME           => $MODULE,
   VERSION_FROM   => 'lib/Tie/Hash/Indexed.pm',
   PREREQ_PM      => { 'Test' => 0 },
-  ($] >= 5.005 ?
-    (ABSTRACT    => 'Ordered hashes for Perl',
-     AUTHOR      => 'Marcus Holland-Moritz <mhx@cpan.org>') : ()),
   INC            => '-I.',
   CONFIGURE      => \&configure,
+  @moreopts,
 );
-
-#############################################################################
 
 sub configure {
   for( keys %FEATURES ) {
@@ -70,27 +76,5 @@ sub configure {
   }
   
   { 'DEFINE' => join(' ', map("-D$_", @DEFINE)) };
-}
-
-sub MY::metafile {
-  package MY;
-  my $self = shift;
-  eval { require YAML; 1 }
-      or return $self->SUPER::metafile_target(@_);
-
-  my $node = new YAML::Node {};
-
-  $node->{name}              = $self->{DISTNAME};
-  $node->{version}           = $self->{VERSION};
-  $node->{license}           = 'perl';
-  $node->{distribution_type} = 'module';
-  $node->{generated_by}      = "$::MODULE $0";
-
-  my $dump = YAML::Dump( $node );
-
-  $dump =~ s/^(.*)$/\t\$(NOECHO) \$(ECHO) "$1" >>META.yml/gm;
-  $dump =~ s/>>META\.yml/>META.yml/;
-
-  return "metafile:\n$dump";
 }
 
