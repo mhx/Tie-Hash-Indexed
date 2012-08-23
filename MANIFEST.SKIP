@@ -1,0 +1,10 @@
+^MANIFEST\.
+^Makefile$
+~$
+\.old(?:\..*)?$
+\.swp$
+\.orig$
+\.cache\.cm$
+^blib
+^devel
+^autogen

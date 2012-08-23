@@ -1,0 +1,11 @@
+Changes
+Indexed.xs
+MANIFEST
+META.yml
+Makefile.PL
+README
+TODO
+lib/Tie/Hash/Indexed.pm
+ppport.h
+t/101_basic.t
+typemap
