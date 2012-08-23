@@ -10,9 +10,9 @@
 *
 * $Project: /Tie-Hash-Indexed $
 * $Author: mhx $
-* $Date: 2006/01/21 09:27:48 +0000 $
-* $Revision: 12 $
-* $Snapshot: /Tie-Hash-Indexed/0.04 $
+* $Date: 2007/08/24 14:09:14 +0100 $
+* $Revision: 14 $
+* $Snapshot: /Tie-Hash-Indexed/0.05 $
 * $Source: /Indexed.xs $
 *
 ********************************************************************************
@@ -209,6 +209,26 @@ static void set_debug_opt(pTHX_ const char *dbopts)
 }
 #endif
 
+static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
+{
+  HE *he;
+
+  if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
+    Perl_croak(aTHX_ "couldn't store value");
+  
+  if (SvTYPE(HeVAL(he)) == SVt_NULL)
+  {
+    IxLink *cur;
+    IxLink_new(cur);
+    IxLink_push(THIS->root, cur);
+    sv_setiv(HeVAL(he), PTR2IV(cur));
+    cur->key = newSVsv(key);
+    cur->val = newSVsv(value);
+  }
+  else
+    sv_setsv((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val, value);
+}
+
 
 /*===== XS FUNCTIONS =========================================================*/
 
@@ -226,11 +246,12 @@ PROTOTYPES: ENABLE
 ################################################################################
 
 IXHV *
-TIEHASH(CLASS)
+TIEHASH(CLASS, ...)
 	char *CLASS
 
 	PREINIT:
 		THI_METHOD(TIEHASH);
+		int i;
 
 	CODE:
 		THI_DEBUG_METHOD;
@@ -240,6 +261,11 @@ TIEHASH(CLASS)
 		RETVAL->iter      = NULL;
 		RETVAL->hv        = newHV();
 		RETVAL->signature = THI_SIGNATURE;
+
+		for (i = 1; i < items; i += 2)
+		{
+		  store(aTHX_ RETVAL, ST(i), ST(i + 1));
+		}
 
 	OUTPUT:
 		RETVAL
@@ -326,26 +352,12 @@ IXHV::STORE(key, value)
 
 	PREINIT:
 		THI_METHOD(STORE);
-		HE *he;
 
 	CODE:
 		THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
 		THI_CHECK_OBJECT;
 
-		if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
-		  Perl_croak(aTHX_ "couldn't store value");
-
-		if (SvTYPE(HeVAL(he)) == SVt_NULL)
-		{
-		  IxLink *cur;
-		  IxLink_new(cur);
-		  IxLink_push(THIS->root, cur);
-		  sv_setiv(HeVAL(he), PTR2IV(cur));
-		  cur->key = newSVsv(key);
-		  cur->val = newSVsv(value);
-		}
-		else
-		  sv_setsv((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val, value);
+		store(aTHX_ THIS, key, value);
 
 ################################################################################
 #

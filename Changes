@@ -1,4 +1,14 @@
 -------------------------
+Version 0.05 (2007-08-24)
+-------------------------
+
+* fixed: added missing interpreter context to store()
+
+* add support of initialization in tie statement
+
+* skip untie tests for perl-5.9.3
+
+-------------------------
 Version 0.04 (2006-01-21)
 -------------------------
 

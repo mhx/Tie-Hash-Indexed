@@ -2,9 +2,8 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2006/01/21 09:28:25 +0000 $
-# $Revision: 5 $
-# $Snapshot: /Tie-Hash-Indexed/0.04 $
+# $Date: 2007/08/24 14:12:22 +0100 $
+# $Revision: 7 $
 # $Source: /t/101_basic.t $
 #
 ################################################################################
@@ -17,13 +16,15 @@
 
 use Test;
 
-BEGIN { plan tests => 29 };
+BEGIN { plan tests => 32 };
 
 use Tie::Hash::Indexed;
 ok(1);
 
 $scalar = $] < 5.008003 || $] == 5.009
         ? 'skip: no scalar context for tied hashes' : '';
+
+$broken_untie = $] == 5.009003 ? 'skip: broken untie' : '';
 
 tie %h, 'Tie::Hash::Indexed';
 ok(1);
@@ -55,10 +56,10 @@ skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 == scalar keys %h);
 
 while (my($k,$v) = each %h) {
   $key .= $k;
-  $val += $v;
+  push @val, $v;
 }
 ok($key, 'foobarzoobazxxx');
-ok($val, 20);
+ok(join('|', @val), '6|2|3|4|5');
 
 $val = delete $h{bar};
 ok($val, 2);
@@ -89,6 +90,13 @@ ok($h{foo}, 42);
 untie %h;
 
 # TODO: these tests fail with recent versions of blead
-# ok(scalar keys %h, 0);
-# ok(join(',', %h), '');
+skip($broken_untie, scalar keys %h, 0);
+skip($broken_untie, join(',', %h), '');
+
+# test Tie::InsertOrderHash-like initializer
+
+tie my %hash => 'Tie::Hash::Indexed',
+    foo => 1, bar => 2, zoo => 3, baz => 4;
+
+ok(join(',', keys %hash), 'foo,bar,zoo,baz');
 

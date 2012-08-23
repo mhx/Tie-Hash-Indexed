@@ -2,9 +2,8 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2006/01/21 09:29:26 +0000 $
-# $Revision: 1 $
-# $Snapshot: /Tie-Hash-Indexed/0.04 $
+# $Date: 2006/01/21 11:07:00 +0000 $
+# $Revision: 2 $
 # $Source: /t/103_bugs.t $
 #
 ################################################################################
