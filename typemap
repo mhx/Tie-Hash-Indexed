@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/10/30 17:56:31 +0000 $
-# $Revision: 1 $
-# $Snapshot: /Tie-Hash-Indexed/0.01 $
+# $Date: 2003/11/05 21:11:42 +0000 $
+# $Revision: 2 $
+# $Snapshot: /Tie-Hash-Indexed/0.03 $
 # $Source: /typemap $
 #
 ################################################################################
@@ -24,10 +24,11 @@ T_OBJECT
 
 INPUT
 T_OBJECT
-	if (sv_isobject($arg) && SvTYPE(SvRV($arg)) == SVt_PVMG) {
+	if (sv_isobject($arg) && SvTYPE(SvRV($arg)) == SVt_PVMG)
+	{
 	  IV tmp = SvIV((SV*)SvRV($arg));
 	  $var = INT2PTR($type, tmp);
 	}
 	else
-	  Perl_croak(aTHX_ \"${Package}::$func_name() : $var is not a blessed SV reference\");
+	  Perl_croak(aTHX_ \"${Package}::$func_name(): $var is not a blessed SV reference\");
 

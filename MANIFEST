@@ -8,4 +8,5 @@ TODO
 lib/Tie/Hash/Indexed.pm
 ppport.h
 t/101_basic.t
+t/102_storable.t
 typemap

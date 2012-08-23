@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/03 21:25:27 +0000 $
-# $Revision: 3 $
-# $Snapshot: /Tie-Hash-Indexed/0.02 $
+# $Date: 2003/11/05 21:11:26 +0000 $
+# $Revision: 4 $
+# $Snapshot: /Tie-Hash-Indexed/0.03 $
 # $Source: /Makefile.PL $
 #
 ################################################################################
@@ -16,8 +16,38 @@
 ################################################################################
 
 use ExtUtils::MakeMaker;
+use Config;
 
 $MODULE = 'Tie::Hash::Indexed';
+
+%FEATURES = (
+  debug => {
+             enabled => $Config{ccflags} =~ /-DDEBUGGING\b/ ? 1 : 0,
+             e_flags => [qw( THI_DEBUGGING )],
+             d_flags => [qw( NDEBUG )],
+           },
+);
+
+@ARGV = map {
+  my $myopt = 0;
+  if( my($what, $feat) = /^(en|dis)able-(\S+)$/ ) {
+    exists $FEATURES{$feat} or $feat = '$'.$feat;
+    exists $FEATURES{$feat}
+      or die "Invalid feature '$2'. Use one of [ @{[keys %FEATURES]} ].\n";
+    $FEATURES{$feat}{enabled} = $what eq 'en';
+    $myopt = 1;
+  }
+  elsif( /^help$/ ) {
+    die <<ENDUSAGE;
+
+USAGE: $^X Makefile.PL enable-feature disable-feature
+
+  Available Features: @{[sort grep !/^\$/, keys %FEATURES]}
+
+ENDUSAGE
+  }
+  $myopt ? () : $_
+} @ARGV;
 
 WriteMakefile(
   NAME           => $MODULE,
@@ -27,7 +57,20 @@ WriteMakefile(
     (ABSTRACT    => 'Ordered hashes for Perl',
      AUTHOR      => 'Marcus Holland-Moritz <mhx@cpan.org>') : ()),
   INC            => '-I.',
+  CONFIGURE      => \&configure,
 );
+
+#############################################################################
+
+sub configure {
+  for( keys %FEATURES ) {
+    my $f = $FEATURES{$_};
+    $f->{enabled} and print "Building with feature '$_'\n";
+    push @DEFINE, @{$f->{enabled} ? $f->{e_flags} : $f->{d_flags} };
+  }
+  
+  { 'DEFINE' => join(' ', map("-D$_", @DEFINE)) };
+}
 
 sub MY::metafile {
   package MY;

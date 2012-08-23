@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/03 21:17:47 +0000 $
-# $Revision: 3 $
-# $Snapshot: /Tie-Hash-Indexed/0.02 $
+# $Date: 2003/11/11 20:42:36 +0000 $
+# $Revision: 4 $
+# $Snapshot: /Tie-Hash-Indexed/0.03 $
 # $Source: /lib/Tie/Hash/Indexed.pm $
 #
 ################################################################################
@@ -22,7 +22,7 @@ use Tie::Hash;
 use vars qw($VERSION @ISA);
 
 @ISA = qw(DynaLoader Tie::Hash);
-$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.02 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
+$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.03 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
 
 bootstrap Tie::Hash::Indexed $VERSION;
 
@@ -53,6 +53,27 @@ it is written completely in XS and usually about twice as
 fast as Tie::IxHash. It's quite a lot faster when it comes
 to clearing or deleting entries from large hashes.
 Currently, only the plain tying mechanism is supported.
+
+=head1 ENVIRONMENT
+
+=head2 C<THI_DEBUG_OPT>
+
+If Tie::Hash::Indexed is built with debugging support, you
+can use this environment variable to specify debugging
+options. Currently, the only useful values you can pass
+in are C<d> or C<all>, which both enable debug output for
+the module.
+
+=head1 PROBLEMS
+
+As the data of Tie::Hash::Indexed objects is hidden inside
+the XS implementation, cloning/serialization is problematic.
+Tie::Hash::Indexed implements hooks for Storable, so cloning
+or serializing objects using Storable is safe.
+
+Tie::Hash::Indexed tries very hard to detect any corruption
+in its data at runtime. So if something goes wrong, you'll
+most probably receive an appropriate error message.
 
 =head1 BUGS
 

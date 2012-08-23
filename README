@@ -2,7 +2,8 @@ CONTENTS
 
 1. DESCRIPTION
 2. INSTALLATION
-3. COPYRIGHT
+3. FEATURES
+4. COPYRIGHT
 
 
 --------------
@@ -32,8 +33,35 @@ Note that you may need to become superuser to 'make install'.
 If you're building the module under Windows, you may need to use a
 different make program, such as 'nmake', instead of 'make'.
 
+-----------
+3. FEATURES
+-----------
+
+You can enable or disable certain features at compile time by adding
+options to the Makefile.PL call. However, you can safely leave them
+at their default.
+
+Currently, the only available feature is 'debug' to build the module
+with debugging support. If your perl binary was already built with
+debugging support, the 'debug' feature is enabled by default.
+
+You can enable or disable features explicitly by adding the arguments
+
+  enable-feature
+  disable-feature
+
+to the Makefile.PL call. To explicitly build the module with debugging
+enabled, you would say:
+
+  perl Makefile.PL enable-debug
+
+This will still allow you to pass other 'standard' arguments to
+Makefile.PL, like
+
+  perl Makefile.PL enable-debug OPTIMIZE=-O3
+
 ------------
-3. COPYRIGHT
+4. COPYRIGHT
 ------------
 
 Copyright (c) 2003 Marcus Holland-Moritz. All rights reserved.

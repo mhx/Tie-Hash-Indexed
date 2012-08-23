@@ -1,4 +1,15 @@
 ------------
+Version 0.03
+------------
+
+* added Storable hooks to allow for serializing
+  and cloning objects using Storable
+
+* added runtime object corruption detection
+
+* added debugging support
+
+------------
 Version 0.02
 ------------
 

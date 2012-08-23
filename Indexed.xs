@@ -10,9 +10,9 @@
 *
 * $Project: /Tie-Hash-Indexed $
 * $Author: mhx $
-* $Date: 2003/11/03 19:05:10 +0000 $
-* $Revision: 4 $
-* $Snapshot: /Tie-Hash-Indexed/0.02 $
+* $Date: 2003/11/11 21:03:52 +0000 $
+* $Revision: 8 $
+* $Snapshot: /Tie-Hash-Indexed/0.03 $
 * $Source: /Indexed.xs $
 *
 ********************************************************************************
@@ -23,28 +23,77 @@
 *
 *******************************************************************************/
 
+
+/*===== GLOBAL INCLUDES ======================================================*/
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
 
 #include "ppport.h"
 
-/* #define THI_DEBUGGING */
 
-typedef struct sIxLink IxLink;
+/*===== DEFINES ==============================================================*/
 
-struct sIxLink {
-  SV     *key;
-  SV     *val;
-  IxLink *prev;
-  IxLink *next;
-};
+#define XSCLASS "Tie::Hash::Indexed"
 
-typedef struct {
-  HV     *hv;
-  IxLink *root;
-  IxLink *iter;
-} IXHV;
+/*-----------------*/
+/* debugging stuff */
+/*-----------------*/
+
+#define DB_THI_MAIN      0x00000001
+
+#ifdef THI_DEBUGGING
+#  define DEBUG_FLAG(flag) \
+            (DB_THI_ ## flag & gs_dbflags)
+#  define THI_DEBUG(flag, x) \
+            do { if (DEBUG_FLAG(flag)) debug_printf x; } while (0)
+#  define DBG_CTXT_FMT "%s"
+#  define DBG_CTXT_ARG (GIMME_V == G_VOID   ? "0=" : \
+                       (GIMME_V == G_SCALAR ? "$=" : \
+                       (GIMME_V == G_ARRAY  ? "@=" : \
+                                              "?="   \
+                       )))
+#else
+#  define THI_DEBUG(flag, x) (void) 0
+#endif
+
+#define THI_DEBUG_METHOD                                                       \
+          THI_DEBUG(MAIN, (DBG_CTXT_FMT XSCLASS "::%s\n", DBG_CTXT_ARG, method))
+
+#define THI_DEBUG_METHOD1(fmt, arg1)                                           \
+          THI_DEBUG(MAIN, (DBG_CTXT_FMT XSCLASS "::%s(" fmt ")\n",             \
+                           DBG_CTXT_ARG, method, arg1))
+
+#define THI_DEBUG_METHOD2(fmt, arg1, arg2)                                     \
+          THI_DEBUG(MAIN, (DBG_CTXT_FMT XSCLASS "::%s(" fmt ")\n",             \
+                           DBG_CTXT_ARG, method, arg1, arg2))
+
+#define THI_METHOD( name )         const char * const method = #name
+#define THI_METHOD_VAR             const char * method = ""
+#define THI_METHOD_SET( string )   method = string
+
+/*---------------------------------*/
+/* check object against corruption */
+/*---------------------------------*/
+
+#define THI_CHECK_OBJECT                                                       \
+        do {                                                                   \
+          if (THIS == NULL )                                                   \
+            Perl_croak(aTHX_ "NULL OBJECT IN " XSCLASS "::%s", method);        \
+          if (THIS->signature != THI_SIGNATURE)                                \
+          {                                                                    \
+            if (THIS->signature == 0xDEADC0DE)                                 \
+              Perl_croak(aTHX_ "DEAD OBJECT IN " XSCLASS "::%s", method);      \
+            Perl_croak(aTHX_ "INVALID OBJECT IN " XSCLASS "::%s", method);     \
+          }                                                                    \
+          if (THIS->hv == NULL || THIS->root == NULL)                          \
+            Perl_croak(aTHX_ "OBJECT INCONSITENCY IN " XSCLASS "::%s", method);\
+        } while (0)
+
+/*--------------------------------*/
+/* very simple doubly linked list */
+/*--------------------------------*/
 
 #define IxLink_new(link)                                                       \
         do {                                                                   \
@@ -54,7 +103,11 @@ typedef struct {
           (link)->prev = (link)->next = link;                                  \
         } while (0)
 
-#define IxLink_delete(link)   Safefree(link)
+#define IxLink_delete(link)                                                    \
+        do {                                                                   \
+          Safefree(link);                                                      \
+          link = NULL;                                                         \
+        } while (0)
 
 #define IxLink_push(root, link)                                                \
         do {                                                                   \
@@ -72,8 +125,55 @@ typedef struct {
           (link)->prev       = (link);                                         \
         } while (0)
 
+
+/*===== TYPEDEFS =============================================================*/
+
+typedef struct sIxLink IxLink;
+
+struct sIxLink {
+  SV     *key;
+  SV     *val;
+  IxLink *prev;
+  IxLink *next;
+};
+
+typedef struct {
+  HV     *hv;
+  IxLink *root;
+  IxLink *iter;
+  U32     signature;
+#define THI_SIGNATURE 0x54484924
+} IXHV;
+
+/*---------------*/
+/* serialization */
+/*---------------*/
+
+typedef struct {
+    char id[4];
+#define THI_SERIAL_ID          "THI!"   /* this must _never_ be changed */
+    unsigned char major;
+#define THI_SERIAL_REV_MAJOR    0        /* incompatible changes */
+    unsigned char minor;
+#define THI_SERIAL_REV_MINOR    0        /* compatible changes */
+} SerialRev;
+
+typedef struct {
+  SerialRev rev;
+  /* add configuration items here, don't change order, only use bytes */
+} Serialized;
+
+
+/*===== STATIC VARIABLES =====================================================*/
+
 #ifdef THI_DEBUGGING
-#  define THI_DEBUG(x) debug_printf x
+static U32 gs_dbflags;
+#endif
+
+
+/*===== STATIC FUNCTIONS =====================================================*/
+
+#ifdef THI_DEBUGGING
 static void debug_printf(char *f, ...)
 {
   va_list l;
@@ -81,39 +181,82 @@ static void debug_printf(char *f, ...)
   vfprintf(stderr, f, l);
   va_end(l);
 }
-#else
-#  define THI_DEBUG(x)
+
+static void set_debug_opt(pTHX_ const char *dbopts)
+{
+  if (strEQ(dbopts, "all"))
+    gs_dbflags = 0xFFFFFFFF;
+  else
+  {
+    gs_dbflags = 0;
+    while( *dbopts )
+    {
+      switch( *dbopts )
+      {
+        case 'd': gs_dbflags |= DB_THI_MAIN;  break;
+        default:
+          Perl_croak(aTHX_ "Unknown debug option '%c'", *dbopts);
+          break;
+      }
+      dbopts++;
+    }
+  }
+}
 #endif
 
+
+/*===== XS FUNCTIONS =========================================================*/
 
 MODULE = Tie::Hash::Indexed		PACKAGE = Tie::Hash::Indexed		
 
 PROTOTYPES: ENABLE
 
+################################################################################
+#
+#   METHOD: TIEHASH
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
 IXHV *
 TIEHASH(CLASS)
 	char *CLASS
 
+	PREINIT:
+		THI_METHOD( TIEHASH );
+
 	CODE:
-		THI_DEBUG(("IXHV::TIEHASH()\n"));
+		THI_DEBUG_METHOD;
 
 		Newz(0, RETVAL, 1, IXHV);
-
-		RETVAL->hv   = newHV();
-		RETVAL->iter = NULL;
 		IxLink_new(RETVAL->root);
+		RETVAL->iter      = NULL;
+		RETVAL->hv        = newHV();
+		RETVAL->signature = THI_SIGNATURE;
 
 	OUTPUT:
 		RETVAL
 
+################################################################################
+#
+#   METHOD: DESTROY
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::DESTROY()
 	PREINIT:
+		THI_METHOD( DESTROY );
 		IxLink *cur;
 
 	CODE:
-		THI_DEBUG(("IXHV::DESTROY()\n"));
+		THI_DEBUG_METHOD;
+		THI_CHECK_OBJECT;
 
 		for (cur = THIS->root->next; cur != THIS->root;)
 		{
@@ -127,18 +270,34 @@ IXHV::DESTROY()
 
 		IxLink_delete(THIS->root);
 		SvREFCNT_dec(THIS->hv);
+
+		THIS->root      = NULL;
+		THIS->iter      = NULL;
+		THIS->hv        = NULL;
+		THIS->signature = 0xDEADC0DE;
+
 		Safefree(THIS);
 
+################################################################################
+#
+#   METHOD: FETCH
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::FETCH(key)
 	SV *key
 
 	PREINIT:
+		THI_METHOD( FETCH );
 		HE *he;
 
 	PPCODE:
-		THI_DEBUG(("IXHV::FETCH()\n"));
+		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+		THI_CHECK_OBJECT;
 
 		if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
 		  XSRETURN_UNDEF;
@@ -146,6 +305,14 @@ IXHV::FETCH(key)
 		ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val);
 		XSRETURN(1);
 
+################################################################################
+#
+#   METHOD: STORE
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::STORE(key, value)
@@ -153,10 +320,12 @@ IXHV::STORE(key, value)
 	SV *value
 
 	PREINIT:
+		THI_METHOD( STORE );
 		HE *he;
 
 	CODE:
-		THI_DEBUG(("IXHV::STORE()\n"));
+		THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
+		THI_CHECK_OBJECT;
 
 		if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
 		  Perl_croak(aTHX_ "couldn't store value");
@@ -173,11 +342,23 @@ IXHV::STORE(key, value)
 		else
 		  sv_setsv((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val, value);
 
+################################################################################
+#
+#   METHOD: FIRSTKEY
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::FIRSTKEY()
+	PREINIT:
+		THI_METHOD( FIRSTKEY );
+
 	PPCODE:
-		THI_DEBUG(("IXHV::FIRSTKEY()\n"));
+		THI_DEBUG_METHOD;
+		THI_CHECK_OBJECT;
 
 		THIS->iter = THIS->root->next;
 
@@ -187,13 +368,25 @@ IXHV::FIRSTKEY()
 		ST(0) = sv_mortalcopy(THIS->iter->key);
 		XSRETURN(1);
 
+################################################################################
+#
+#   METHOD: NEXTKEY
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::NEXTKEY(last)
 	SV *last
 
+	PREINIT:
+		THI_METHOD( NEXTKEY );
+
 	PPCODE:
-		THI_DEBUG(("IXHV::NEXTKEY()\n"));
+		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(last));
+		THI_CHECK_OBJECT;
 
 		THIS->iter = THIS->iter->next;
 
@@ -203,30 +396,52 @@ IXHV::NEXTKEY(last)
 		ST(0) = sv_mortalcopy(THIS->iter->key);
 		XSRETURN(1);
 
+################################################################################
+#
+#   METHOD: EXISTS
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::EXISTS(key)
 	SV *key
 
+	PREINIT:
+		THI_METHOD( EXISTS );
+
 	PPCODE:
-		THI_DEBUG(("IXHV::EXISTS()\n"));
+		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+		THI_CHECK_OBJECT;
 
 		if (hv_exists_ent(THIS->hv, key, 0))
 		  XSRETURN_YES;
 		else
 		  XSRETURN_NO;
 
+################################################################################
+#
+#   METHOD: DELETE
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::DELETE(key)
 	SV *key
 
 	PREINIT:
+		THI_METHOD( DELETE );
 		IxLink *cur;
 		SV *sv;
 
 	PPCODE:
-		THI_DEBUG(("IXHV::DELETE()\n"));
+		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+		THI_CHECK_OBJECT;
 
 		if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
 		  XSRETURN_UNDEF;
@@ -240,14 +455,24 @@ IXHV::DELETE(key)
 		ST(0) = sv_2mortal(sv);
 		XSRETURN(1);
 
+################################################################################
+#
+#   METHOD: CLEAR
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
 
 void
 IXHV::CLEAR()
 	PREINIT:
+		THI_METHOD( CLEAR );
 		IxLink *cur;
 
-	CODE:
-		THI_DEBUG(("IXHV::CLEAR()\n"));
+	PPCODE:
+		THI_DEBUG_METHOD;
+		THI_CHECK_OBJECT;
 
 		for (cur = THIS->root->next; cur != THIS->root;)
 		{
@@ -262,4 +487,138 @@ IXHV::CLEAR()
 		THIS->root->next = THIS->root->prev = THIS->root;
 
 		hv_clear(THIS->hv);
+
+################################################################################
+#
+#   METHOD: STORABLE_freeze
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::STORABLE_freeze(cloning)
+	int cloning;
+
+	PREINIT:
+		THI_METHOD( STORABLE_freeze );
+		Serialized s;
+		IxLink *cur;
+		int n;
+
+	PPCODE:
+		THI_DEBUG_METHOD1("%d", cloning);
+		THI_CHECK_OBJECT;
+
+		Copy(THI_SERIAL_ID, &s.rev.id[0], 4, char);
+		s.rev.major = THI_SERIAL_REV_MAJOR;
+		s.rev.minor = THI_SERIAL_REV_MINOR;
+
+		XPUSHs(sv_2mortal(newSVpvn((char *)&s, sizeof(Serialized))));
+		n = 1;
+		for (cur = THIS->root->next; cur != THIS->root; cur = cur->next)
+		{
+		  XPUSHs(sv_2mortal(newRV_inc(cur->key)));
+		  XPUSHs(sv_2mortal(newRV_inc(cur->val)));
+		  n += 2;
+		}
+
+		XSRETURN(n);
+
+################################################################################
+#
+#   METHOD: STORABLE_thaw
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+STORABLE_thaw(object, cloning, serialized, ...)
+	SV *object;
+	int cloning;
+	SV *serialized;
+
+	PREINIT:
+		THI_METHOD( STORABLE_thaw );
+		IXHV *THIS;
+		Serialized *ps;
+		STRLEN len;
+		int i;
+
+	PPCODE:
+		THI_DEBUG_METHOD2("%d, '%s'", cloning, SvPV_nolen(serialized));
+
+		if (!sv_isobject(object) || SvTYPE(SvRV(object)) != SVt_PVMG)
+		  Perl_croak(aTHX_ XSCLASS "::%s: THIS is not "
+		                           "a blessed SV reference", method);
+
+		ps = (Serialized *) SvPV(serialized, len);
+
+		if (len < sizeof(SerialRev) ||
+		    strnNE(THI_SERIAL_ID, &ps->rev.id[0], 4))
+		  Perl_croak(aTHX_ "invalid frozen "
+		                   XSCLASS " object (len=%d)", len);
+
+		if (ps->rev.major != THI_SERIAL_REV_MAJOR)
+		  Perl_croak(aTHX_ "cannot thaw incompatible "
+		                   XSCLASS " object");
+
+		/* TODO: implement minor revision handling */
+
+		Newz(0, THIS, 1, IXHV);
+		sv_setiv((SV*)SvRV(object), PTR2IV(THIS));
+
+		THIS->signature = THI_SIGNATURE;
+		THIS->hv = newHV();
+		THIS->iter = NULL;
+		IxLink_new(THIS->root);
+
+		if ((items-3) % 2)
+		  Perl_croak(aTHX_ "odd number of items in STORABLE_thaw");
+
+		for (i = 3; i < items; i+=2)
+		{
+		  IxLink *cur;
+		  SV *key, *val;
+
+		  key = SvRV(ST(i));
+		  val = SvRV(ST(i+1));
+
+		  IxLink_new(cur);
+		  IxLink_push(THIS->root, cur);
+
+		  cur->key = newSVsv(key);
+		  cur->val = newSVsv(val);
+
+		  val = newSViv(PTR2IV(cur));
+
+		  if (hv_store_ent(THIS->hv, key, val, 0) == NULL)
+		  {
+		    SvREFCNT_dec(val);
+		    Perl_croak(aTHX_ "couldn't store value");
+		  }
+		}
+
+		XSRETURN_EMPTY;
+
+################################################################################
+#
+#   BOOTCODE
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+BOOT:
+#ifdef THI_DEBUGGING
+		{
+		  const char *str;
+		  if( (str = getenv("THI_DEBUG_OPT")) != NULL )
+		    set_debug_opt( aTHX_ str );
+		}
+#endif
 
