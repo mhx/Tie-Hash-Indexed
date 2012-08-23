@@ -1,3 +1,28 @@
+/*******************************************************************************
+*
+* MODULE: C.xs
+*
+********************************************************************************
+*
+* DESCRIPTION: XS Interface for Tie::Hash::Indexed Perl extension module
+*
+********************************************************************************
+*
+* $Project: /Tie-Hash-Indexed $
+* $Author: mhx $
+* $Date: 2003/11/03 19:05:10 +0000 $
+* $Revision: 4 $
+* $Snapshot: /Tie-Hash-Indexed/0.02 $
+* $Source: /Indexed.xs $
+*
+********************************************************************************
+*
+* Copyright (c) 2002-2003 Marcus Holland-Moritz. All rights reserved.
+* This program is free software; you can redistribute it and/or modify
+* it under the same terms as Perl itself.
+*
+*******************************************************************************/
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"

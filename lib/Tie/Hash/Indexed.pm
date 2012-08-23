@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/02 14:11:06 +0000 $
-# $Revision: 2 $
-# $Snapshot: /Tie-Hash-Indexed/0.01 $
+# $Date: 2003/11/03 21:17:47 +0000 $
+# $Revision: 3 $
+# $Snapshot: /Tie-Hash-Indexed/0.02 $
 # $Source: /lib/Tie/Hash/Indexed.pm $
 #
 ################################################################################
@@ -16,13 +16,13 @@
 ################################################################################
 
 package Tie::Hash::Indexed;
-use 5.00405;
+use 5.004;
 use DynaLoader;
 use Tie::Hash;
 use vars qw($VERSION @ISA);
 
 @ISA = qw(DynaLoader Tie::Hash);
-$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.01 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
+$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.02 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
 
 bootstrap Tie::Hash::Indexed $VERSION;
 

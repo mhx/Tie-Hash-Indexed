@@ -2,9 +2,9 @@
 #
 # $Project: /Tie-Hash-Indexed $
 # $Author: mhx $
-# $Date: 2003/11/02 14:11:32 +0000 $
-# $Revision: 2 $
-# $Snapshot: /Tie-Hash-Indexed/0.01 $
+# $Date: 2003/11/03 21:25:27 +0000 $
+# $Revision: 3 $
+# $Snapshot: /Tie-Hash-Indexed/0.02 $
 # $Source: /Makefile.PL $
 #
 ################################################################################
@@ -22,6 +22,7 @@ $MODULE = 'Tie::Hash::Indexed';
 WriteMakefile(
   NAME           => $MODULE,
   VERSION_FROM   => 'lib/Tie/Hash/Indexed.pm',
+  PREREQ_PM      => { 'Test' => 0 },
   ($] >= 5.005 ?
     (ABSTRACT    => 'Ordered hashes for Perl',
      AUTHOR      => 'Marcus Holland-Moritz <mhx@cpan.org>') : ()),

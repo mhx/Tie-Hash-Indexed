@@ -170,9 +170,10 @@ __DATA__
 
 #ifndef PERL_REVISION
 #   ifndef __PATCHLEVEL_H_INCLUDED__
+#       define PERL_PATCHLEVEL_H_IMPLICIT
 #       include <patchlevel.h>
 #   endif
-#   if !(defined(PERL_VERSION) || (SUBVERSION > 0 && defined(PATCHLEVEL)))
+#   if !(defined(PERL_VERSION) || (defined(SUBVERSION) && defined(PATCHLEVEL)))
 #       include <could_not_find_Perl_patchlevel.h>
 #   endif
 #   ifndef PERL_REVISION
@@ -1086,3 +1087,4 @@ Perl_grok_number(pTHX_ const char *pv, STRLEN len, UV *valuep)
 #endif /* _P_P_PORTABILITY_H_ */
 
 /* End of File ppport.h */
+
