@@ -229,7 +229,7 @@ static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
 
 /*===== XS FUNCTIONS =========================================================*/
 
-MODULE = Tie::Hash::Indexed		PACKAGE = Tie::Hash::Indexed		
+MODULE = Tie::Hash::Indexed    PACKAGE = Tie::Hash::Indexed
 
 PROTOTYPES: ENABLE
 
@@ -244,30 +244,30 @@ PROTOTYPES: ENABLE
 
 IXHV *
 TIEHASH(CLASS, ...)
-	char *CLASS
+  char *CLASS
 
-	PREINIT:
-		THI_METHOD(TIEHASH);
-		SV **cur;
-		SV **end;
+  PREINIT:
+    THI_METHOD(TIEHASH);
+    SV **cur;
+    SV **end;
 
-	CODE:
-		THI_DEBUG_METHOD;
+  CODE:
+    THI_DEBUG_METHOD;
 
-		New(0, RETVAL, 1, IXHV);
-		IxLink_new(RETVAL->root);
-		RETVAL->iter      = NULL;
-		RETVAL->hv        = newHV();
-		RETVAL->signature = THI_SIGNATURE;
+    New(0, RETVAL, 1, IXHV);
+    IxLink_new(RETVAL->root);
+    RETVAL->iter      = NULL;
+    RETVAL->hv        = newHV();
+    RETVAL->signature = THI_SIGNATURE;
 
-		end = &ST(items);
-		for (cur = &ST(1); cur < end; cur += 2)
-		{
-		  store(aTHX_ RETVAL, cur[0], cur[1]);
-		}
+    end = &ST(items);
+    for (cur = &ST(1); cur < end; cur += 2)
+    {
+      store(aTHX_ RETVAL, cur[0], cur[1]);
+    }
 
-	OUTPUT:
-		RETVAL
+  OUTPUT:
+    RETVAL
 
 ################################################################################
 #
@@ -280,34 +280,34 @@ TIEHASH(CLASS, ...)
 
 void
 IXHV::DESTROY()
-	PREINIT:
-		THI_METHOD(DESTROY);
-		IxLink *cur;
+  PREINIT:
+    THI_METHOD(DESTROY);
+    IxLink *cur;
 
-	PPCODE:
-		PUTBACK;
-		THI_DEBUG_METHOD;
-		THI_CHECK_OBJECT;
+  PPCODE:
+    PUTBACK;
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
 
-		for (cur = THIS->root->next; cur != THIS->root;)
-		{
-		  IxLink *del = cur;
-		  cur = cur->next;
-		  SvREFCNT_dec_NN(del->key);
-		  SvREFCNT_dec(del->val);
-		  IxLink_delete(del);
-		}
+    for (cur = THIS->root->next; cur != THIS->root;)
+    {
+      IxLink *del = cur;
+      cur = cur->next;
+      SvREFCNT_dec_NN(del->key);
+      SvREFCNT_dec(del->val);
+      IxLink_delete(del);
+    }
 
-		IxLink_delete(THIS->root);
-		SvREFCNT_dec(THIS->hv);
+    IxLink_delete(THIS->root);
+    SvREFCNT_dec(THIS->hv);
 
-		THIS->root      = NULL;
-		THIS->iter      = NULL;
-		THIS->hv        = NULL;
-		THIS->signature = 0xDEADC0DE;
+    THIS->root      = NULL;
+    THIS->iter      = NULL;
+    THIS->hv        = NULL;
+    THIS->signature = 0xDEADC0DE;
 
-		Safefree(THIS);
-		return;
+    Safefree(THIS);
+    return;
 
 ################################################################################
 #
@@ -320,21 +320,21 @@ IXHV::DESTROY()
 
 void
 IXHV::FETCH(key)
-	SV *key
+  SV *key
 
-	PREINIT:
-		THI_METHOD(FETCH);
-		HE *he;
+  PREINIT:
+    THI_METHOD(FETCH);
+    HE *he;
 
-	PPCODE:
-		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+    THI_CHECK_OBJECT;
 
-		if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
-		  XSRETURN_UNDEF;
+    if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
+      XSRETURN_UNDEF;
 
-		ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
-		XSRETURN(1);
+    ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
+    XSRETURN(1);
 
 ################################################################################
 #
@@ -347,19 +347,19 @@ IXHV::FETCH(key)
 
 void
 IXHV::STORE(key, value)
-	SV *key
-	SV *value
+  SV *key
+  SV *value
 
-	PREINIT:
-		THI_METHOD(STORE);
+  PREINIT:
+    THI_METHOD(STORE);
 
-	PPCODE:
-		PUTBACK;
-		THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
-		THI_CHECK_OBJECT;
+  PPCODE:
+    PUTBACK;
+    THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
+    THI_CHECK_OBJECT;
 
-		store(aTHX_ THIS, key, value);
-		return;
+    store(aTHX_ THIS, key, value);
+    return;
 
 ################################################################################
 #
@@ -372,20 +372,20 @@ IXHV::STORE(key, value)
 
 void
 IXHV::FIRSTKEY()
-	PREINIT:
-		THI_METHOD(FIRSTKEY);
+  PREINIT:
+    THI_METHOD(FIRSTKEY);
 
-	PPCODE:
-		THI_DEBUG_METHOD;
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
 
-		THIS->iter = THIS->root->next;
+    THIS->iter = THIS->root->next;
 
-		if (THIS->iter->key == NULL)
-		  XSRETURN_UNDEF;
+    if (THIS->iter->key == NULL)
+      XSRETURN_UNDEF;
 
-		ST(0) = sv_mortalcopy(THIS->iter->key);
-		XSRETURN(1);
+    ST(0) = sv_mortalcopy(THIS->iter->key);
+    XSRETURN(1);
 
 ################################################################################
 #
@@ -398,22 +398,22 @@ IXHV::FIRSTKEY()
 
 void
 IXHV::NEXTKEY(last)
-	SV *last
+  SV *last
 
-	PREINIT:
-		THI_METHOD(NEXTKEY);
+  PREINIT:
+    THI_METHOD(NEXTKEY);
 
-	PPCODE:
-		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(last));
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD1("'%s'", SvPV_nolen(last));
+    THI_CHECK_OBJECT;
 
-		THIS->iter = THIS->iter->next;
+    THIS->iter = THIS->iter->next;
 
-		if (THIS->iter->key == NULL)
-		  XSRETURN_UNDEF;
+    if (THIS->iter->key == NULL)
+      XSRETURN_UNDEF;
 
-		ST(0) = sv_mortalcopy(THIS->iter->key);
-		XSRETURN(1);
+    ST(0) = sv_mortalcopy(THIS->iter->key);
+    XSRETURN(1);
 
 ################################################################################
 #
@@ -426,19 +426,19 @@ IXHV::NEXTKEY(last)
 
 void
 IXHV::EXISTS(key)
-	SV *key
+  SV *key
 
-	PREINIT:
-		THI_METHOD(EXISTS);
+  PREINIT:
+    THI_METHOD(EXISTS);
 
-	PPCODE:
-		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+    THI_CHECK_OBJECT;
 
-		if (hv_exists_ent(THIS->hv, key, 0))
-		  XSRETURN_YES;
-		else
-		  XSRETURN_NO;
+    if (hv_exists_ent(THIS->hv, key, 0))
+      XSRETURN_YES;
+    else
+      XSRETURN_NO;
 
 ################################################################################
 #
@@ -451,44 +451,44 @@ IXHV::EXISTS(key)
 
 void
 IXHV::DELETE(key)
-	SV *key
+  SV *key
 
-	PREINIT:
-		THI_METHOD(DELETE);
-		IxLink *cur;
-		SV *sv;
+  PREINIT:
+    THI_METHOD(DELETE);
+    IxLink *cur;
+    SV *sv;
 
-	PPCODE:
-		SP++;
-		PUTBACK;
-		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
-		THI_CHECK_OBJECT;
+  PPCODE:
+    SP++;
+    PUTBACK;
+    THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
+    THI_CHECK_OBJECT;
 
-		if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
-		{
-		  THI_DEBUG(MAIN, ("key '%s' not found\n", SvPV_nolen(key)));
-		  *SP = &PL_sv_undef;
-		  return;
-		}
+    if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
+    {
+      THI_DEBUG(MAIN, ("key '%s' not found\n", SvPV_nolen(key)));
+      *SP = &PL_sv_undef;
+      return;
+    }
 
-		cur = INT2PTR(IxLink *, SvIVX(sv));
-		*SP = cur->val;
+    cur = INT2PTR(IxLink *, SvIVX(sv));
+    *SP = cur->val;
 
-		if (THIS->iter == cur)
-		{
-		  THI_DEBUG(MAIN, ("need to move current iterator %p -> %p\n",
-		                   THIS->iter, cur->prev));
-		  THIS->iter = cur->prev;
-		}
-		sv_2mortal(cur->val);
+    if (THIS->iter == cur)
+    {
+      THI_DEBUG(MAIN, ("need to move current iterator %p -> %p\n",
+                       THIS->iter, cur->prev));
+      THIS->iter = cur->prev;
+    }
+    sv_2mortal(cur->val);
 
-		IxLink_extract(cur);
-		SvREFCNT_dec_NN(cur->key);
-		IxLink_delete(cur);
+    IxLink_extract(cur);
+    SvREFCNT_dec_NN(cur->key);
+    IxLink_delete(cur);
 
-		THI_DEBUG(MAIN, ("key '%s' deleted\n", SvPV_nolen(key)));
+    THI_DEBUG(MAIN, ("key '%s' deleted\n", SvPV_nolen(key)));
 
-		return;
+    return;
 
 ################################################################################
 #
@@ -501,26 +501,26 @@ IXHV::DELETE(key)
 
 void
 IXHV::CLEAR()
-	PREINIT:
-		THI_METHOD(CLEAR);
-		IxLink *cur;
+  PREINIT:
+    THI_METHOD(CLEAR);
+    IxLink *cur;
 
-	PPCODE:
-		THI_DEBUG_METHOD;
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
 
-		for (cur = THIS->root->next; cur != THIS->root;)
-		{
-		  IxLink *del = cur;
-		  cur = cur->next;
-		  SvREFCNT_dec_NN(del->key);
-		  SvREFCNT_dec(del->val);
-		  IxLink_delete(del);
-		}
+    for (cur = THIS->root->next; cur != THIS->root;)
+    {
+      IxLink *del = cur;
+      cur = cur->next;
+      SvREFCNT_dec_NN(del->key);
+      SvREFCNT_dec(del->val);
+      IxLink_delete(del);
+    }
 
-		THIS->root->next = THIS->root->prev = THIS->root;
+    THIS->root->next = THIS->root->prev = THIS->root;
 
-		hv_clear(THIS->hv);
+    hv_clear(THIS->hv);
 
 ################################################################################
 #
@@ -533,23 +533,23 @@ IXHV::CLEAR()
 
 void
 IXHV::SCALAR()
-	PREINIT:
-		THI_METHOD(SCALAR);
+  PREINIT:
+    THI_METHOD(SCALAR);
 
-	PPCODE:
-		THI_DEBUG_METHOD;
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
 #ifdef hv_scalar
-		ST(0) = hv_scalar(THIS->hv);
+    ST(0) = hv_scalar(THIS->hv);
 #else
-		ST(0) = sv_newmortal();
-		if (HvFILL(THIS->hv))
-		  Perl_sv_setpvf(aTHX_ ST(0), "%ld/%ld", (long)HvFILL(THIS->hv),
-		                                       (long)HvMAX(THIS->hv)+1);
-		else
-		  sv_setiv(ST(0), 0);
+    ST(0) = sv_newmortal();
+    if (HvFILL(THIS->hv))
+      Perl_sv_setpvf(aTHX_ ST(0), "%ld/%ld", (long)HvFILL(THIS->hv),
+                                           (long)HvMAX(THIS->hv)+1);
+    else
+      sv_setiv(ST(0), 0);
 #endif
-		XSRETURN(1);
+    XSRETURN(1);
 
 ################################################################################
 #
@@ -562,28 +562,28 @@ IXHV::SCALAR()
 
 void
 IXHV::STORABLE_freeze(cloning)
-	int cloning;
+  int cloning;
 
-	PREINIT:
-		THI_METHOD(STORABLE_freeze);
-		Serialized s;
-		IxLink *cur;
+  PREINIT:
+    THI_METHOD(STORABLE_freeze);
+    Serialized s;
+    IxLink *cur;
 
-	PPCODE:
-		THI_DEBUG_METHOD1("%d", cloning);
-		THI_CHECK_OBJECT;
+  PPCODE:
+    THI_DEBUG_METHOD1("%d", cloning);
+    THI_CHECK_OBJECT;
 
-		Copy(THI_SERIAL_ID, &s.rev.id[0], 4, char);
-		s.rev.major = THI_SERIAL_REV_MAJOR;
-		s.rev.minor = THI_SERIAL_REV_MINOR;
+    Copy(THI_SERIAL_ID, &s.rev.id[0], 4, char);
+    s.rev.major = THI_SERIAL_REV_MAJOR;
+    s.rev.minor = THI_SERIAL_REV_MINOR;
 
-		XPUSHs(sv_2mortal(newSVpvn((char *)&s, sizeof(Serialized))));
-		for (cur = THIS->root->next; cur != THIS->root; cur = cur->next)
-		{
-		  EXTEND(SP, 2);
-		  PUSHs(sv_2mortal(newRV_inc(cur->key)));
-		  PUSHs(sv_2mortal(newRV_inc(cur->val)));
-		}
+    XPUSHs(sv_2mortal(newSVpvn((char *)&s, sizeof(Serialized))));
+    for (cur = THIS->root->next; cur != THIS->root; cur = cur->next)
+    {
+      EXTEND(SP, 2);
+      PUSHs(sv_2mortal(newRV_inc(cur->key)));
+      PUSHs(sv_2mortal(newRV_inc(cur->val)));
+    }
 
 ################################################################################
 #
@@ -596,72 +596,72 @@ IXHV::STORABLE_freeze(cloning)
 
 void
 STORABLE_thaw(object, cloning, serialized, ...)
-	SV *object;
-	int cloning;
-	SV *serialized;
+  SV *object;
+  int cloning;
+  SV *serialized;
 
-	PREINIT:
-		THI_METHOD(STORABLE_thaw);
-		IXHV *THIS;
-		Serialized *ps;
-		STRLEN len;
-		int i;
+  PREINIT:
+    THI_METHOD(STORABLE_thaw);
+    IXHV *THIS;
+    Serialized *ps;
+    STRLEN len;
+    int i;
 
-	PPCODE:
-		THI_DEBUG_METHOD1("%d", cloning);
+  PPCODE:
+    THI_DEBUG_METHOD1("%d", cloning);
 
-		if (!sv_isobject(object) || SvTYPE(SvRV(object)) != SVt_PVMG)
-		  Perl_croak(aTHX_ XSCLASS "::%s: THIS is not "
-		                           "a blessed SV reference", method);
+    if (!sv_isobject(object) || SvTYPE(SvRV(object)) != SVt_PVMG)
+      Perl_croak(aTHX_ XSCLASS "::%s: THIS is not "
+                               "a blessed SV reference", method);
 
-		ps = (Serialized *) SvPV(serialized, len);
+    ps = (Serialized *) SvPV(serialized, len);
 
-		if (len < sizeof(SerialRev) ||
-		    strnNE(THI_SERIAL_ID, &ps->rev.id[0], 4))
-		  Perl_croak(aTHX_ "invalid frozen "
-		                   XSCLASS " object (len=%d)", len);
+    if (len < sizeof(SerialRev) ||
+        strnNE(THI_SERIAL_ID, &ps->rev.id[0], 4))
+      Perl_croak(aTHX_ "invalid frozen "
+                       XSCLASS " object (len=%d)", len);
 
-		if (ps->rev.major != THI_SERIAL_REV_MAJOR)
-		  Perl_croak(aTHX_ "cannot thaw incompatible "
-		                   XSCLASS " object");
+    if (ps->rev.major != THI_SERIAL_REV_MAJOR)
+      Perl_croak(aTHX_ "cannot thaw incompatible "
+                       XSCLASS " object");
 
-		/* TODO: implement minor revision handling */
+    /* TODO: implement minor revision handling */
 
-		New(0, THIS, 1, IXHV);
-		sv_setiv((SV*)SvRV(object), PTR2IV(THIS));
+    New(0, THIS, 1, IXHV);
+    sv_setiv((SV*)SvRV(object), PTR2IV(THIS));
 
-		THIS->signature = THI_SIGNATURE;
-		THIS->hv = newHV();
-		THIS->iter = NULL;
-		IxLink_new(THIS->root);
+    THIS->signature = THI_SIGNATURE;
+    THIS->hv = newHV();
+    THIS->iter = NULL;
+    IxLink_new(THIS->root);
 
-		if ((items-3) % 2)
-		  Perl_croak(aTHX_ "odd number of items in STORABLE_thaw");
+    if ((items-3) % 2)
+      Perl_croak(aTHX_ "odd number of items in STORABLE_thaw");
 
-		for (i = 3; i < items; i+=2)
-		{
-		  IxLink *cur;
-		  SV *key, *val;
+    for (i = 3; i < items; i+=2)
+    {
+      IxLink *cur;
+      SV *key, *val;
 
-		  key = SvRV(ST(i));
-		  val = SvRV(ST(i+1));
+      key = SvRV(ST(i));
+      val = SvRV(ST(i+1));
 
-		  IxLink_new(cur);
-		  IxLink_push(THIS->root, cur);
+      IxLink_new(cur);
+      IxLink_push(THIS->root, cur);
 
-		  cur->key = newSVsv(key);
-		  cur->val = newSVsv(val);
+      cur->key = newSVsv(key);
+      cur->val = newSVsv(val);
 
-		  val = newSViv(PTR2IV(cur));
+      val = newSViv(PTR2IV(cur));
 
-		  if (hv_store_ent(THIS->hv, key, val, 0) == NULL)
-		  {
-		    SvREFCNT_dec(val);
-		    Perl_croak(aTHX_ "couldn't store value");
-		  }
-		}
+      if (hv_store_ent(THIS->hv, key, val, 0) == NULL)
+      {
+        SvREFCNT_dec(val);
+        Perl_croak(aTHX_ "couldn't store value");
+      }
+    }
 
-		XSRETURN_EMPTY;
+    XSRETURN_EMPTY;
 
 ################################################################################
 #
@@ -674,9 +674,9 @@ STORABLE_thaw(object, cloning, serialized, ...)
 
 BOOT:
 #ifdef THI_DEBUGGING
-		{
-		  const char *str;
-		  if ((str = getenv("THI_DEBUG_OPT")) != NULL)
-		    set_debug_opt(aTHX_ str);
-		}
+    {
+      const char *str;
+      if ((str = getenv("THI_DEBUG_OPT")) != NULL)
+        set_debug_opt(aTHX_ str);
+    }
 #endif
