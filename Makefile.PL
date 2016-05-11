@@ -45,9 +45,29 @@ if (eval $ExtUtils::MakeMaker::VERSION >= 6) {
                   ABSTRACT_FROM => 'lib/Tie/Hash/Indexed.pm';
 }
 
-if (eval $ExtUtils::MakeMaker::VERSION >= 6.30_01) {
+if (eval $ExtUtils::MakeMaker::VERSION >= 6.31) {
   print "Setting license tag...\n";
   push @moreopts, LICENSE => 'perl';
+}
+
+if (eval $ExtUtils::MakeMaker::VERSION >= 6.46) {
+  print "Setting metadata...\n";
+  push @moreopts,
+    META_MERGE    => {
+      'meta-spec' => {
+        version => 2,
+      },
+      resources => {
+        bugtracker => {
+          web => 'https://github.com/mhx/Tie-Hash-Indexed/issues/',
+        },
+        repository => {
+          type => 'git',
+          url  => 'git://github.com/mhx/Tie-Hash-Indexed.git',
+          web  => 'https://github.com/mhx/Tie-Hash-Indexed/',
+        },
+      },
+    };
 }
 
 WriteMakefile(
@@ -65,7 +85,6 @@ sub configure {
     $f->{enabled} and print "Building with feature '$_'\n";
     push @DEFINE, @{$f->{enabled} ? $f->{e_flags} : $f->{d_flags} };
   }
-  
+
   { 'DEFINE' => join(' ', map("-D$_", @DEFINE)) };
 }
-
