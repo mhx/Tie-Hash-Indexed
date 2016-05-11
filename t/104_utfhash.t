@@ -3,22 +3,31 @@ use Test;
 use Tie::Hash::Indexed;
 use strict;
 
-BEGIN { plan tests => 97 }
+BEGIN {
+  plan tests => 97;
+
+  if ($[ < 5.006) {
+    for (1..97) {
+      skip("No UTF8 support", 0, 0);
+    }
+    exit 0;
+  }
+}
 
 # Two hashes one will all keys 8-bit possible (initially), other
 # with a utf8 requiring key from the outset.
 
 tie my %hash8, 'Tie::Hash::Indexed';
 %hash8 = ( "\xff" => 0xff,
-              "\x7f" => 0x7f,
-            );
+           "\x7f" => 0x7f,
+         );
 tie my %hashu, 'Tie::Hash::Indexed';
 %hashu = ( "\xff" => 0xff,
-              "\x7f" => 0x7f,
-              "\x{1ff}" => 0x1ff,
-            );
+           "\x7f" => 0x7f,
+           "\x{1ff}" => 0x1ff,
+         );
 
-# Check that we can find the 8-bit things by various litterals
+# Check that we can find the 8-bit things by various literals
 ok($hash8{"\x{00ff}"},0xFF);
 ok($hash8{"\x{007f}"},0x7F);
 ok($hash8{"\xff"},0xFF);
@@ -29,8 +38,7 @@ ok($hashu{"\xff"},0xFF);
 ok($hashu{"\x7f"},0x7F);
 
 # Now try same thing with variables forced into various forms.
-foreach my $a ("\x7f","\xff")
- {
+foreach my $a ("\x7f","\xff") {
   utf8::upgrade($a);
   ok($hash8{$a},ord($a));
   ok($hashu{$a},ord($a));
@@ -41,7 +49,7 @@ foreach my $a ("\x7f","\xff")
   chop($b);
   ok($hash8{$b},ord($b));
   ok($hashu{$b},ord($b));
- }
+}
 
 # Check we have not got an spurious extra keys
 printf "8[%d]\n", ord $_ for sort { ord $a <=> ord $b } keys %hash8;
@@ -55,21 +63,19 @@ $hash8{chr(0x1ff)} = 0x1ff;
 # Check we have not got an spurious extra keys
 ok(join('',sort { ord $a <=> ord $b } keys %hash8),"\x7f\xff\x{1ff}");
 
-foreach my $a ("\x7f","\xff","\x{1ff}")
- {
+foreach my $a ("\x7f","\xff","\x{1ff}") {
   utf8::upgrade($a);
   ok($hash8{$a},ord($a));
   my $b = $a.chr(100);
   chop($b);
   ok($hash8{$b},ord($b));
- }
+}
 
 # and remove utf8 from the other hash
 ok(delete $hashu{chr(0x1ff)},0x1ff);
 ok(join('',sort keys %hashu),"\x7f\xff");
 
-foreach my $a ("\x7f","\xff")
- {
+foreach my $a ("\x7f","\xff") {
   utf8::upgrade($a);
   ok($hashu{$a},ord($a));
   utf8::downgrade($a);
@@ -77,9 +83,7 @@ foreach my $a ("\x7f","\xff")
   my $b = $a.chr(100);
   chop($b);
   ok($hashu{$b},ord($b));
- }
-
-
+}
 
 {
   print "# Unicode hash keys and \\w\n";
@@ -99,9 +103,9 @@ foreach my $a ("\x7f","\xff")
     $keys .= ($keys == 1) ? " key" : " keys";
 
     for (keys %u) {
-        my $l = 0 + /^\w+$/;
-        my $r = 0 + $u{$_} =~ /^\w+$/;
-	ok($l, $r, "\\w on keys with $keys, key of length " . length $_);
+      my $l = 0 + /^\w+$/;
+      my $r = 0 + $u{$_} =~ /^\w+$/;
+      ok($l, $r, "\\w on keys with $keys, key of length " . length $_);
     }
 
     my $more;
