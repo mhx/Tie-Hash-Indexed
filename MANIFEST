@@ -3,8 +3,10 @@ Indexed.xs
 lib/Tie/Hash/Indexed.pm
 Makefile.PL
 MANIFEST
+MANIFEST.SKIP
 ppport.h
 README
+README.md
 t/101_basic.t
 t/102_storable.t
 t/103_bugs.t
