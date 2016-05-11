@@ -22,9 +22,7 @@
 #include "perl.h"
 #include "XSUB.h"
 
-#ifdef THI_DEBUGGING
-#define NEED_sv_2pv_nolen
-#endif
+#define NEED_sv_2pv_flags
 
 #include "ppport.h"
 
