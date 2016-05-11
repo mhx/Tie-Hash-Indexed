@@ -6,7 +6,7 @@ use strict;
 BEGIN {
   plan tests => 97;
 
-  if ($] < 5.006) {
+  if ($] < 5.008) {
     for (1..97) {
       skip("No UTF8 support", 0, 0);
     }
@@ -52,8 +52,6 @@ foreach my $a ("\x7f","\xff") {
 }
 
 # Check we have not got an spurious extra keys
-printf "8[%d]\n", ord $_ for sort { ord $a <=> ord $b } keys %hash8;
-printf "u[%d]\n", ord $_ for sort { ord $a <=> ord $b } keys %hashu;
 ok(join('',sort { ord $a <=> ord $b } keys %hash8),"\x7f\xff");
 ok(join('',sort { ord $a <=> ord $b } keys %hashu),"\x7f\xff\x{1ff}");
 
@@ -178,13 +176,14 @@ foreach my $a ("\x7f","\xff") {
   # See if utf8 barewords work [perl #22969]
   use utf8;
   my %hash;
+  my $bare = $] < 5.008001 ? 'skip: no utf8 barewords' : '';
   tie %hash, 'Tie::Hash::Indexed';
   %hash = (тест => 123);
-  ok($hash{тест}, $hash{'тест'});
-  ok($hash{тест}, 123);
+  skip($bare, $hash{тест}, $hash{'тест'});
+  skip($bare, $hash{тест}, 123);
   ok($hash{'тест'}, 123);
   %hash = (тест => 123);
-  ok($hash{тест}, $hash{'тест'});
-  ok($hash{тест}, 123);
+  skip($bare, $hash{тест}, $hash{'тест'});
+  skip($bare, $hash{тест}, 123);
   ok($hash{'тест'}, 123);
 }

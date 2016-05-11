@@ -203,6 +203,10 @@ static void set_debug_opt(pTHX_ const char *dbopts)
 # define HeVAL(he) (he)->hent_val
 #endif
 
+#ifndef SvREFCNT_dec_NN
+# define SvREFCNT_dec_NN(sv) SvREFCNT_dec(sv)
+#endif
+
 static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
 {
   HE *he;
