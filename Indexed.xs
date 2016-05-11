@@ -64,8 +64,6 @@
                            DBG_CTXT_ARG, method, arg1, arg2))
 
 #define THI_METHOD( name )         const char * const method = #name
-#define THI_METHOD_VAR             const char * method = ""
-#define THI_METHOD_SET( string )   method = string
 
 /*---------------------------------*/
 /* check object against corruption */
@@ -91,7 +89,7 @@
 
 #define IxLink_new(link)                                                       \
         do {                                                                   \
-          Newz(0, link, 1, IxLink);                                            \
+          New(0, link, 1, IxLink);                                             \
           (link)->key = NULL;                                                  \
           (link)->val = NULL;                                                  \
           (link)->prev = (link)->next = link;                                  \
@@ -170,6 +168,9 @@ static U32 gs_dbflags;
 #ifdef THI_DEBUGGING
 static void debug_printf(char *f, ...)
 {
+#ifdef PERL_IMPLICIT_SYS
+  dTHX;
+#endif
   va_list l;
   va_start(l, f);
   vfprintf(stderr, f, l);
@@ -205,21 +206,24 @@ static void set_debug_opt(pTHX_ const char *dbopts)
 static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
 {
   HE *he;
+  SV *pair;
 
   if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
     Perl_croak(aTHX_ "couldn't store value");
 
-  if (SvTYPE(HeVAL(he)) == SVt_NULL)
+  pair = HeVAL(he);
+
+  if (SvTYPE(pair) == SVt_NULL)
   {
     IxLink *cur;
     IxLink_new(cur);
     IxLink_push(THIS->root, cur);
-    sv_setiv(HeVAL(he), PTR2IV(cur));
+    sv_setiv(pair, PTR2IV(cur));
     cur->key = newSVsv(key);
     cur->val = newSVsv(value);
   }
   else
-    sv_setsv((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val, value);
+    sv_setsv((INT2PTR(IxLink *, SvIVX(pair)))->val, value);
 }
 
 
@@ -244,20 +248,22 @@ TIEHASH(CLASS, ...)
 
 	PREINIT:
 		THI_METHOD(TIEHASH);
-		int i;
+		SV **cur;
+		SV **end;
 
 	CODE:
 		THI_DEBUG_METHOD;
 
-		Newz(0, RETVAL, 1, IXHV);
+		New(0, RETVAL, 1, IXHV);
 		IxLink_new(RETVAL->root);
 		RETVAL->iter      = NULL;
 		RETVAL->hv        = newHV();
 		RETVAL->signature = THI_SIGNATURE;
 
-		for (i = 1; i < items; i += 2)
+		end = &ST(items);
+		for (cur = &ST(1); cur < end; cur += 2)
 		{
-		  store(aTHX_ RETVAL, ST(i), ST(i + 1));
+		  store(aTHX_ RETVAL, cur[0], cur[1]);
 		}
 
 	OUTPUT:
@@ -278,7 +284,8 @@ IXHV::DESTROY()
 		THI_METHOD(DESTROY);
 		IxLink *cur;
 
-	CODE:
+	PPCODE:
+		PUTBACK;
 		THI_DEBUG_METHOD;
 		THI_CHECK_OBJECT;
 
@@ -286,9 +293,8 @@ IXHV::DESTROY()
 		{
 		  IxLink *del = cur;
 		  cur = cur->next;
-		  SvREFCNT_dec(del->key);
-                  if (del->val)
-		    SvREFCNT_dec(del->val);
+		  SvREFCNT_dec_NN(del->key);
+		  SvREFCNT_dec(del->val);
 		  IxLink_delete(del);
 		}
 
@@ -301,6 +307,7 @@ IXHV::DESTROY()
 		THIS->signature = 0xDEADC0DE;
 
 		Safefree(THIS);
+		return;
 
 ################################################################################
 #
@@ -326,7 +333,7 @@ IXHV::FETCH(key)
 		if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
 		  XSRETURN_UNDEF;
 
-		ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIV(HeVAL(he))))->val);
+		ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
 		XSRETURN(1);
 
 ################################################################################
@@ -346,11 +353,13 @@ IXHV::STORE(key, value)
 	PREINIT:
 		THI_METHOD(STORE);
 
-	CODE:
+	PPCODE:
+		PUTBACK;
 		THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
 		THI_CHECK_OBJECT;
 
 		store(aTHX_ THIS, key, value);
+		return;
 
 ################################################################################
 #
@@ -450,18 +459,20 @@ IXHV::DELETE(key)
 		SV *sv;
 
 	PPCODE:
+		SP++;
+		PUTBACK;
 		THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
 		THI_CHECK_OBJECT;
 
 		if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
 		{
 		  THI_DEBUG(MAIN, ("key '%s' not found\n", SvPV_nolen(key)));
-		  XSRETURN_UNDEF;
+		  *SP = &PL_sv_undef;
+		  return;
 		}
 
-		cur = INT2PTR(IxLink *, SvIV(sv));
-		SvREFCNT_dec(cur->key);
-		sv = cur->val;
+		cur = INT2PTR(IxLink *, SvIVX(sv));
+		*SP = cur->val;
 
 		if (THIS->iter == cur)
 		{
@@ -469,14 +480,15 @@ IXHV::DELETE(key)
 		                   THIS->iter, cur->prev));
 		  THIS->iter = cur->prev;
 		}
+		sv_2mortal(cur->val);
 
 		IxLink_extract(cur);
+		SvREFCNT_dec_NN(cur->key);
 		IxLink_delete(cur);
 
 		THI_DEBUG(MAIN, ("key '%s' deleted\n", SvPV_nolen(key)));
 
-		ST(0) = sv_2mortal(sv);
-		XSRETURN(1);
+		return;
 
 ################################################################################
 #
@@ -501,9 +513,8 @@ IXHV::CLEAR()
 		{
 		  IxLink *del = cur;
 		  cur = cur->next;
-		  SvREFCNT_dec(del->key);
-                  if (del->val)
-		    SvREFCNT_dec(del->val);
+		  SvREFCNT_dec_NN(del->key);
+		  SvREFCNT_dec(del->val);
 		  IxLink_delete(del);
 		}
 
@@ -557,7 +568,6 @@ IXHV::STORABLE_freeze(cloning)
 		THI_METHOD(STORABLE_freeze);
 		Serialized s;
 		IxLink *cur;
-		int n;
 
 	PPCODE:
 		THI_DEBUG_METHOD1("%d", cloning);
@@ -568,15 +578,12 @@ IXHV::STORABLE_freeze(cloning)
 		s.rev.minor = THI_SERIAL_REV_MINOR;
 
 		XPUSHs(sv_2mortal(newSVpvn((char *)&s, sizeof(Serialized))));
-		n = 1;
 		for (cur = THIS->root->next; cur != THIS->root; cur = cur->next)
 		{
-		  XPUSHs(sv_2mortal(newRV_inc(cur->key)));
-		  XPUSHs(sv_2mortal(newRV_inc(cur->val)));
-		  n += 2;
+		  EXTEND(SP, 2);
+		  PUSHs(sv_2mortal(newRV_inc(cur->key)));
+		  PUSHs(sv_2mortal(newRV_inc(cur->val)));
 		}
-
-		XSRETURN(n);
 
 ################################################################################
 #
@@ -620,7 +627,7 @@ STORABLE_thaw(object, cloning, serialized, ...)
 
 		/* TODO: implement minor revision handling */
 
-		Newz(0, THIS, 1, IXHV);
+		New(0, THIS, 1, IXHV);
 		sv_setiv((SV*)SvRV(object), PTR2IV(THIS));
 
 		THIS->signature = THI_SIGNATURE;
