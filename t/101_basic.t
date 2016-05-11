@@ -8,7 +8,7 @@
 
 use Test;
 
-BEGIN { plan tests => 32 };
+BEGIN { plan tests => 35 };
 
 use Tie::Hash::Indexed;
 ok(1);
@@ -31,20 +31,23 @@ ok(join(',', keys %h), 'foo,bar,zoo,baz');
 ok(exists $h{foo});
 ok(exists $h{bar});
 ok(!exists $h{xxx});
+ok(scalar keys %h, 4);
 $s = &scalar_h;
-skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 == scalar keys %h);
+skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 > 0 && $1 <= scalar keys %h);
 
 $h{xxx} = 5;
 ok(join(',', keys %h), 'foo,bar,zoo,baz,xxx');
 ok(exists $h{xxx});
+ok(scalar keys %h, 5);
 $s = &scalar_h;
-skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 == scalar keys %h);
+skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 > 0 && $1 <= scalar keys %h);
 
 $h{foo} = 6;
 ok(join(',', keys %h), 'foo,bar,zoo,baz,xxx');
 ok(exists $h{foo});
+ok(scalar keys %h, 5);
 $s = &scalar_h;
-skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 == scalar keys %h);
+skip($scalar, $s =~ /^(\d+)\/\d+$/ && $1 > 0 && $1 <= scalar keys %h);
 
 while (my($k,$v) = each %h) {
   $key .= $k;
