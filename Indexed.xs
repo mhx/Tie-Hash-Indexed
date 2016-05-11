@@ -198,13 +198,17 @@ static void set_debug_opt(pTHX_ const char *dbopts)
 }
 #endif
 
+#ifndef HeVAL
+# define HeVAL(he) (he)->hent_val
+#endif
+
 static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
 {
   HE *he;
 
   if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
     Perl_croak(aTHX_ "couldn't store value");
-  
+
   if (SvTYPE(HeVAL(he)) == SVt_NULL)
   {
     IxLink *cur;
@@ -528,7 +532,7 @@ IXHV::SCALAR()
 		ST(0) = hv_scalar(THIS->hv);
 #else
 		ST(0) = sv_newmortal();
-		if (HvFILL(THIS->hv)) 
+		if (HvFILL(THIS->hv))
 		  Perl_sv_setpvf(aTHX_ ST(0), "%ld/%ld", (long)HvFILL(THIS->hv),
 		                                       (long)HvMAX(THIS->hv)+1);
 		else
@@ -669,4 +673,3 @@ BOOT:
 		    set_debug_opt(aTHX_ str);
 		}
 #endif
-
