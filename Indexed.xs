@@ -8,16 +8,7 @@
 *
 ********************************************************************************
 *
-* $Project: /Tie-Hash-Indexed $
-* $Author: mhx $
-* $Date: 2007/08/24 14:09:14 +0100 $
-* $Revision: 14 $
-* $Snapshot: /Tie-Hash-Indexed/0.05 $
-* $Source: /Indexed.xs $
-*
-********************************************************************************
-*
-* Copyright (c) 2002-2003 Marcus Holland-Moritz. All rights reserved.
+* Copyright (c) 2002-2016 Marcus Holland-Moritz. All rights reserved.
 * This program is free software; you can redistribute it and/or modify
 * it under the same terms as Perl itself.
 *
