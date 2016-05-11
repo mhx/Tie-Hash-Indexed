@@ -6,7 +6,7 @@ use strict;
 BEGIN {
   plan tests => 97;
 
-  if ($[ < 5.006) {
+  if ($] < 5.006) {
     for (1..97) {
       skip("No UTF8 support", 0, 0);
     }
