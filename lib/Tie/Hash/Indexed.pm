@@ -14,7 +14,7 @@ use Tie::Hash;
 use vars qw($VERSION @ISA);
 
 @ISA = qw(DynaLoader Tie::Hash);
-$VERSION = do { my @r = '$Snapshot: /Tie-Hash-Indexed/0.05 $' =~ /(\d+\.\d+(?:_\d+)?)/; @r ? $r[0] : '9.99' };
+$VERSION = '0.05_01';
 
 bootstrap Tie::Hash::Indexed $VERSION;
 
@@ -82,7 +82,7 @@ If you're interested in what I currently plan to improve
 
 =head1 COPYRIGHT
 
-Copyright (c) 2003 Marcus Holland-Moritz. All rights reserved.
+Copyright (c) 2003-2016 Marcus Holland-Moritz. All rights reserved.
 This program is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
 
