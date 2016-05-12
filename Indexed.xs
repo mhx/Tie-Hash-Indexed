@@ -101,13 +101,19 @@
           link = NULL;                                                         \
         } while (0)
 
-#define IxLink_push(root, link)                                                \
+#define IxLink_common_(root, link, prev, next)                                 \
         do {                                                                   \
           (link)->prev       = (root)->prev;                                   \
           (link)->next       = (root);                                         \
           (root)->prev->next = (link);                                         \
           (root)->prev       = (link);                                         \
         } while (0)
+
+#define IxLink_push(root, link)                                                \
+          IxLink_common_(root, link, prev, next)
+
+#define IxLink_unshift(root, link)                                             \
+          IxLink_common_(root, link, next, prev)
 
 #define IxLink_extract(link)                                                   \
         do {                                                                   \
@@ -205,11 +211,36 @@ static void set_debug_opt(pTHX_ const char *dbopts)
 # define HeVAL(he) (he)->hent_val
 #endif
 
+#ifndef HvUSEDKEYS
+# define HvUSEDKEYS(hv) HvKEYS(hv)
+#endif
+
 #ifndef SvREFCNT_dec_NN
 # define SvREFCNT_dec_NN(sv) SvREFCNT_dec(sv)
 #endif
 
-static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
+enum store_mode {
+  SM_SET,
+  SM_PUSH,
+  SM_UNSHIFT,
+};
+
+static void ixlink_insert(IxLink *root, IxLink *cur, enum store_mode mode)
+{
+  switch (mode)
+  {
+    case SM_SET:
+    case SM_PUSH:
+      IxLink_push(root, cur);
+      break;
+
+    case SM_UNSHIFT:
+      IxLink_unshift(root, cur);
+      break;
+  }
+}
+
+static void ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode mode)
 {
   HE *he;
   SV *pair;
@@ -225,15 +256,45 @@ static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
   {
     IxLink *cur;
     IxLink_new(cur);
-    IxLink_push(THIS->root, cur);
+
+    ixlink_insert(THIS->root, cur, mode);
+
     sv_setiv(pair, PTR2IV(cur));
+
     cur->key = newSVsv(key);
     cur->val = newSVsv(value);
   }
   else
-    sv_setsv((INT2PTR(IxLink *, SvIVX(pair)))->val, value);
+  {
+    IxLink *cur = INT2PTR(IxLink *, SvIVX(pair));
+
+    if (mode != SM_SET)
+    {
+      IxLink_extract(cur);
+      ixlink_insert(THIS->root, cur, mode);
+    }
+
+    sv_setsv(cur->val, value);
+  }
 }
 
+static void ixhv_clear(pTHX_ IXHV *THIS)
+{
+  IxLink *cur;
+
+  for (cur = THIS->root->next; cur != THIS->root;)
+  {
+    IxLink *del = cur;
+    cur = cur->next;
+    SvREFCNT_dec_NN(del->key);
+    SvREFCNT_dec(del->val);
+    IxLink_delete(del);
+  }
+
+  THIS->root->next = THIS->root->prev = THIS->root;
+
+  hv_clear(THIS->hv);
+}
 
 /*===== XS FUNCTIONS =========================================================*/
 
@@ -276,7 +337,7 @@ TIEHASH(CLASS, ...)
     end = &ST(items);
     for (cur = &ST(1); cur < end; cur += 2)
     {
-      store(aTHX_ RETVAL, cur[0], cur[1]);
+      ixhv_store(aTHX_ RETVAL, cur[0], cur[1], SM_SET);
     }
 
   OUTPUT:
@@ -335,6 +396,9 @@ void
 IXHV::FETCH(key)
   SV *key
 
+  ALIAS:
+    get = 1
+
   PREINIT:
     THI_METHOD(FETCH);
     HE *he;
@@ -365,6 +429,9 @@ IXHV::STORE(key, value)
   SV *key
   SV *value
 
+  ALIAS:
+    set = 1
+
   PREINIT:
     THI_METHOD(STORE);
 
@@ -373,7 +440,7 @@ IXHV::STORE(key, value)
     THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
     THI_CHECK_OBJECT;
 
-    store(aTHX_ THIS, key, value);
+    ixhv_store(aTHX_ THIS, key, value, SM_SET);
     return;
 
 ################################################################################
@@ -447,6 +514,10 @@ void
 IXHV::EXISTS(key)
   SV *key
 
+  ALIAS:
+    exists = 1
+    has = 2
+
   PREINIT:
     THI_METHOD(EXISTS);
 
@@ -476,6 +547,9 @@ void
 IXHV::DELETE(key)
   SV *key
 
+  ALIAS:
+    delete = 1
+
   PREINIT:
     THI_METHOD(DELETE);
     IxLink *cur;
@@ -495,7 +569,7 @@ IXHV::DELETE(key)
     }
 
     cur = INT2PTR(IxLink *, SvIVX(sv));
-    *SP = cur->val;
+    *SP = sv_2mortal(cur->val);
 
     if (THIS->iter == cur)
     {
@@ -503,7 +577,6 @@ IXHV::DELETE(key)
                        THIS->iter, cur->prev));
       THIS->iter = cur->prev;
     }
-    sv_2mortal(cur->val);
 
     IxLink_extract(cur);
     SvREFCNT_dec_NN(cur->key);
@@ -524,26 +597,22 @@ IXHV::DELETE(key)
 
 void
 IXHV::CLEAR()
+  ALIAS:
+    clear = 1
+
   PREINIT:
     THI_METHOD(CLEAR);
-    IxLink *cur;
 
   PPCODE:
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
 
-    for (cur = THIS->root->next; cur != THIS->root;)
+    ixhv_clear(aTHX_ THIS);
+
+    if (ix == 1 && GIMME_V != G_VOID)
     {
-      IxLink *del = cur;
-      cur = cur->next;
-      SvREFCNT_dec_NN(del->key);
-      SvREFCNT_dec(del->val);
-      IxLink_delete(del);
+      XSRETURN(1);
     }
-
-    THIS->root->next = THIS->root->prev = THIS->root;
-
-    hv_clear(THIS->hv);
 
 ################################################################################
 #
@@ -580,6 +649,199 @@ IXHV::SCALAR()
 
 ################################################################################
 #
+#   METHOD: items / as_list / keys / values
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::items(...)
+  ALIAS:
+    as_list = 0
+    keys = 1
+    values = 2
+
+  PREINIT:
+    THI_METHOD(items);
+    STRLEN num_keys;
+    STRLEN num_items;
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
+
+    num_keys = items > 1 ? (items - 1) : HvUSEDKEYS(THIS->hv);
+    num_items = (ix == 0 ? 2 : 1)*num_keys;
+
+    if (GIMME_V == G_SCALAR)
+    {
+      mXPUSHi(num_items);
+    }
+    else
+    {
+      if (items == 1)   /* "vanilla" version */
+      {
+        IxLink *cur;
+
+        EXTEND(SP, num_items);
+
+        for (cur = THIS->root->next; cur != THIS->root; cur = cur->next, num_keys--)
+        {
+          if (ix != 2) PUSHs(sv_mortalcopy(cur->key));
+          if (ix != 1) PUSHs(sv_mortalcopy(cur->val));
+        }
+
+        assert(num_keys == 0);
+      }
+      else   /* slice version */
+      {
+        SV **end;
+        SV **key;
+        SV **beg;
+        HE *he;
+
+        EXTEND(SP, num_items);
+
+        end = &ST(num_items - 1);
+        key = &ST(num_keys - 1);
+        beg = &ST(0);
+
+        Move(beg + 1, beg, items, SV *);
+
+        for (; key >= beg; --key)
+        {
+          if ((he = hv_fetch_ent(THIS->hv, *key, 0, 0)) != NULL)
+          {
+            if (ix != 1)
+            {
+              *end-- = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
+            }
+          }
+          else
+          {
+            if (ix != 1)
+            {
+              *end-- = &PL_sv_undef;
+            }
+          }
+          if (ix != 2) *end-- = *key;
+        }
+      }
+      XSRETURN(num_items);
+    }
+
+################################################################################
+#
+#   METHOD: merge / assign / push / unshift
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::merge(...)
+  ALIAS:
+    assign = 1
+    push = 2
+    unshift = 3
+
+  PREINIT:
+    THI_METHOD(merge);
+    SV **cur;
+    SV **end;
+    enum store_mode mode = SM_SET;
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
+
+    if (items % 2 == 0)
+    {
+      Perl_croak(aTHX_ "odd number of arguments");
+    }
+
+    switch (ix)
+    {
+      case 1: ixhv_clear(aTHX_ THIS); break;
+      case 2: mode = SM_PUSH; break;
+      case 3: mode = SM_UNSHIFT; break;
+    }
+
+    if (mode == SM_UNSHIFT)
+    {
+      end = &ST(0);
+      for (cur = &ST(items - 1); cur > end; cur -= 2)
+      {
+        ixhv_store(aTHX_ THIS, cur[-1], cur[0], mode);
+      }
+    }
+    else
+    {
+      end = &ST(items);
+      for (cur = &ST(1); cur < end; cur += 2)
+      {
+        ixhv_store(aTHX_ THIS, cur[0], cur[1], mode);
+      }
+    }
+
+    if (GIMME_V != G_VOID)
+    {
+      XSRETURN_IV(HvUSEDKEYS(THIS->hv));
+    }
+
+################################################################################
+#
+#   METHOD: pop / shift
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::pop()
+  ALIAS:
+    shift = 1
+
+  PREINIT:
+    THI_METHOD(pop);
+    IxLink *root;
+    IxLink *goner;
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+    THI_CHECK_OBJECT;
+
+    root = THIS->root;
+
+    if (root->next == root)
+    {
+      XSRETURN_EMPTY;
+    }
+
+    goner = ix == 0 ? root->prev : root->next;
+    IxLink_extract(goner);
+
+    hv_delete_ent(THIS->hv, goner->key, 0, 0);
+
+    if (GIMME_V == G_ARRAY)
+    {
+      XPUSHs(sv_2mortal(goner->key));
+    }
+    else
+    {
+      SvREFCNT_dec_NN(goner->key);
+    }
+
+    XPUSHs(sv_2mortal(goner->val));
+
+    IxLink_delete(goner);
+
+################################################################################
+#
 #   METHOD: STORABLE_freeze
 #
 #   WRITTEN BY: Marcus Holland-Moritz             ON: Nov 2003
@@ -595,6 +857,7 @@ IXHV::STORABLE_freeze(cloning)
     THI_METHOD(STORABLE_freeze);
     Serialized s;
     IxLink *cur;
+    STRLEN num_keys;
 
   PPCODE:
     THI_DEBUG_METHOD1("%d", cloning);
@@ -605,12 +868,14 @@ IXHV::STORABLE_freeze(cloning)
     s.rev.minor = THI_SERIAL_REV_MINOR;
 
     XPUSHs(sv_2mortal(newSVpvn((char *)&s, sizeof(Serialized))));
-    for (cur = THIS->root->next; cur != THIS->root; cur = cur->next)
+    num_keys = HvUSEDKEYS(THIS->hv);
+    EXTEND(SP, 2*num_keys);
+    for (cur = THIS->root->next; cur != THIS->root; cur = cur->next, num_keys--)
     {
-      EXTEND(SP, 2);
       PUSHs(sv_2mortal(newRV_inc(cur->key)));
       PUSHs(sv_2mortal(newRV_inc(cur->val)));
     }
+    assert(num_keys == 0);
 
 ################################################################################
 #
