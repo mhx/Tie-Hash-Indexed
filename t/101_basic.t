@@ -94,4 +94,3 @@ tie my %hash => 'Tie::Hash::Indexed',
     foo => 1, bar => 2, zoo => 3, baz => 4;
 
 ok(join(',', keys %hash), 'foo,bar,zoo,baz');
-

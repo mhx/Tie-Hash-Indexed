@@ -180,7 +180,9 @@ static void debug_printf(char *f, ...)
 static void set_debug_opt(pTHX_ const char *dbopts)
 {
   if (strEQ(dbopts, "all"))
+  {
     gs_dbflags = 0xFFFFFFFF;
+  }
   else
   {
     gs_dbflags = 0;
@@ -213,7 +215,9 @@ static void store(pTHX_ IXHV *THIS, SV *key, SV *value)
   SV *pair;
 
   if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
+  {
     Perl_croak(aTHX_ "couldn't store value");
+  }
 
   pair = HeVAL(he);
 
@@ -257,6 +261,11 @@ TIEHASH(CLASS, ...)
 
   CODE:
     THI_DEBUG_METHOD;
+
+    if (items % 2 == 0)
+    {
+      Perl_croak(aTHX_ "odd number of arguments");
+    }
 
     New(0, RETVAL, 1, IXHV);
     IxLink_new(RETVAL->root);
@@ -335,7 +344,9 @@ IXHV::FETCH(key)
     THI_CHECK_OBJECT;
 
     if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
+    {
       XSRETURN_UNDEF;
+    }
 
     ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
     XSRETURN(1);
@@ -386,7 +397,9 @@ IXHV::FIRSTKEY()
     THIS->iter = THIS->root->next;
 
     if (THIS->iter->key == NULL)
+    {
       XSRETURN_UNDEF;
+    }
 
     ST(0) = sv_mortalcopy(THIS->iter->key);
     XSRETURN(1);
@@ -414,7 +427,9 @@ IXHV::NEXTKEY(last)
     THIS->iter = THIS->iter->next;
 
     if (THIS->iter->key == NULL)
+    {
       XSRETURN_UNDEF;
+    }
 
     ST(0) = sv_mortalcopy(THIS->iter->key);
     XSRETURN(1);
@@ -440,9 +455,13 @@ IXHV::EXISTS(key)
     THI_CHECK_OBJECT;
 
     if (hv_exists_ent(THIS->hv, key, 0))
+    {
       XSRETURN_YES;
+    }
     else
+    {
       XSRETURN_NO;
+    }
 
 ################################################################################
 #
@@ -548,10 +567,14 @@ IXHV::SCALAR()
 #else
     ST(0) = sv_newmortal();
     if (HvFILL(THIS->hv))
+    {
       Perl_sv_setpvf(aTHX_ ST(0), "%ld/%ld", (long)HvFILL(THIS->hv),
                                            (long)HvMAX(THIS->hv)+1);
+    }
     else
+    {
       sv_setiv(ST(0), 0);
+    }
 #endif
     XSRETURN(1);
 
