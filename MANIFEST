@@ -10,5 +10,7 @@ README.md
 t/101_basic.t
 t/102_storable.t
 t/103_bugs.t
+t/104_utfhash.t
+t/105_oo.t
 TODO
 typemap
