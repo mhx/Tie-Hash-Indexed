@@ -1,4 +1,14 @@
 ----------------------------
+Version 0.05_03 (2016-05-15)
+----------------------------
+
+* added iterator support
+
+* added support for preinc / postinc / predec / postdec
+
+* added support for add / subtract / multiply / divide / ...
+
+----------------------------
 Version 0.05_02 (2016-05-12)
 ----------------------------
 
