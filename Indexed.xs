@@ -83,6 +83,16 @@
             Perl_croak(aTHX_ "OBJECT INCONSITENCY IN " XSCLASS "::%s", method);\
         } while (0)
 
+#define THI_CHECK_ITERATOR                                                     \
+        do {                                                                   \
+          if (SvIVX(THIS->serial) != THIS->orig_serial)                        \
+          {                                                                    \
+            Perl_croak(aTHX_ "invalid iterator access");                       \
+          }                                                                    \
+        } while (0)
+
+#define THI_INVALIDATE_ITERATORS  ++SvIVX(THIS->serial)
+
 /*--------------------------------*/
 /* very simple doubly linked list */
 /*--------------------------------*/
@@ -139,9 +149,18 @@ typedef struct {
   HV     *hv;
   IxLink *root;
   IxLink *iter;
+  SV     *serial;
   U32     signature;
 #define THI_SIGNATURE 0x54484924
 } IXHV;
+
+typedef struct {
+  IxLink *cur;
+  IxLink *end;
+  bool reverse;
+  SV     *serial;
+  IV      orig_serial;
+} Iterator;
 
 /*---------------*/
 /* serialization */
@@ -304,6 +323,59 @@ static IxLink *ixhv_find(pTHX_ IXHV *THIS, SV *key)
 
 /*===== XS FUNCTIONS =========================================================*/
 
+MODULE = Tie::Hash::Indexed    PACKAGE = Tie::Hash::Indexed::Iterator
+
+PROTOTYPES: DISABLE
+
+void
+Iterator::DESTROY()
+  PPCODE:
+    SvREFCNT_dec(THIS->serial);
+    Safefree(THIS);
+
+void
+Iterator::next()
+  ALIAS:
+    prev = 1
+
+  PREINIT:
+    int rvnum = 0;
+
+  PPCODE:
+    THI_CHECK_ITERATOR;
+
+    if (GIMME_V == G_ARRAY && THIS->cur != THIS->end)
+    {
+      EXTEND(SP, 2);
+      PUSHs(sv_mortalcopy(THIS->cur->key));
+      PUSHs(sv_mortalcopy(THIS->cur->val));
+      rvnum = 2;
+    }
+
+    THIS->cur = ix == THIS->reverse ? THIS->cur->next : THIS->cur->prev;
+
+    XSRETURN(rvnum);
+
+bool
+Iterator::valid()
+  CODE:
+    RETVAL = SvIVX(THIS->serial) == THIS->orig_serial &&
+             THIS->cur != THIS->end;
+
+  OUTPUT:
+    RETVAL
+
+void
+Iterator::key()
+  ALIAS:
+    value = 1
+
+  PPCODE:
+    THI_CHECK_ITERATOR;
+    ST(0) = sv_mortalcopy(ix ? THIS->cur->val : THIS->cur->key);
+    XSRETURN(1);
+
+
 MODULE = Tie::Hash::Indexed    PACKAGE = Tie::Hash::Indexed
 
 PROTOTYPES: DISABLE
@@ -342,6 +414,7 @@ TIEHASH(CLASS, ...)
     IxLink_new(RETVAL->root);
     RETVAL->iter      = NULL;
     RETVAL->hv        = newHV();
+    RETVAL->serial    = newSViv(0);
     RETVAL->signature = THI_SIGNATURE;
 
     end = &ST(items);
@@ -373,6 +446,8 @@ IXHV::DESTROY()
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
 
+    THI_INVALIDATE_ITERATORS;
+
     for (cur = THIS->root->next; cur != THIS->root;)
     {
       IxLink *del = cur;
@@ -384,10 +459,12 @@ IXHV::DESTROY()
 
     IxLink_delete(THIS->root);
     SvREFCNT_dec(THIS->hv);
+    SvREFCNT_dec(THIS->serial);
 
     THIS->root      = NULL;
     THIS->iter      = NULL;
     THIS->hv        = NULL;
+    THIS->serial    = NULL;
     THIS->signature = 0xDEADC0DE;
 
     Safefree(THIS);
@@ -449,6 +526,8 @@ IXHV::STORE(key, value)
     THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
     THI_CHECK_OBJECT;
     (void) ix;
+
+    THI_INVALIDATE_ITERATORS;
 
     ixhv_store(aTHX_ THIS, key, value, SM_SET);
     return;
@@ -580,6 +659,8 @@ IXHV::DELETE(key)
       return;
     }
 
+    THI_INVALIDATE_ITERATORS;
+
     cur = INT2PTR(IxLink *, SvIVX(sv));
     *SP = sv_2mortal(cur->val);
 
@@ -619,6 +700,8 @@ IXHV::CLEAR()
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
     (void) ix;
+
+    THI_INVALIDATE_ITERATORS;
 
     ixhv_clear(aTHX_ THIS);
 
@@ -776,6 +859,8 @@ IXHV::merge(...)
       Perl_croak(aTHX_ "odd number of arguments");
     }
 
+    THI_INVALIDATE_ITERATORS;
+
     switch (ix)
     {
       case 1: ixhv_clear(aTHX_ THIS); break;
@@ -835,6 +920,8 @@ IXHV::pop()
       XSRETURN_EMPTY;
     }
 
+    THI_INVALIDATE_ITERATORS;
+
     goner = ix == 0 ? root->prev : root->next;
     IxLink_extract(goner);
 
@@ -852,6 +939,40 @@ IXHV::pop()
     XPUSHs(sv_2mortal(goner->val));
 
     IxLink_delete(goner);
+
+################################################################################
+#
+#   METHOD: iterator / reverse_iterator
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::iterator()
+  ALIAS:
+    reverse_iterator = 1
+
+  PREINIT:
+    THI_METHOD(iterator);
+    Iterator *it;
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+
+    New(0, it, 1, Iterator);
+    it->cur     = ix == 1 ? THIS->root->prev : THIS->root->next;
+    it->end     = THIS->root;
+    it->reverse = ix == 1;
+    it->serial  = THIS->serial;
+    it->orig_serial = SvIVX(it->serial);
+
+    SvREFCNT_inc_simple_void_NN(it->serial);
+
+    ST(0) = sv_newmortal();
+    sv_setref_pv(ST(0), "Tie::Hash::Indexed::Iterator", (void *) it);
+    XSRETURN(1);
 
 ################################################################################
 #
@@ -935,6 +1056,7 @@ STORABLE_thaw(object, cloning, serialized, ...)
     New(0, THIS, 1, IXHV);
     sv_setiv((SV*)SvRV(object), PTR2IV(THIS));
 
+    THIS->serial = newSViv(0);
     THIS->signature = THI_SIGNATURE;
     THIS->hv = newHV();
     THIS->iter = NULL;

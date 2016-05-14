@@ -8,7 +8,7 @@
 
 use Test;
 
-BEGIN { plan tests => 50 };
+BEGIN { plan tests => 57 };
 
 use Tie::Hash::Indexed;
 ok(1);
@@ -35,12 +35,39 @@ ok(join(',', $h->keys('xxx', 'bar')), 'xxx,bar');
 ok(join(',', $h->values('xxx', 'bar')), '5,2');
 ok(join(',', $h->as_list('xxx', 'bar')), 'xxx,5,bar,2');
 
-# while (my($k,$v) = each %h) {
-#   $key .= $k;
-#   push @val, $v;
-# }
-# ok($key, 'foobarzoobazxxx');
-# ok(join('|', @val), '6|2|3|4|5');
+my $i = $h->iterator;
+my(@key, @val);
+while ($i->valid) {
+  push @key, $i->key;
+  push @val, $i->value;
+  $i->next;
+}
+
+ok(join(',', @key), 'foo,bar,zoo,baz,xxx');
+ok(join(',', @val), '6,2,3,4,5');
+
+@key = ();
+@val = ();
+$i->prev;
+while ($i->valid) {
+  push @key, $i->key;
+  push @val, $i->value;
+  $i->prev;
+}
+
+ok(join(',', @key), 'xxx,baz,zoo,bar,foo');
+ok(join(',', @val), '5,4,3,2,6');
+
+@key = ();
+@val = ();
+$i = $h->reverse_iterator;
+while (my($k,$v) = $i->next) {
+  push @key, $k;
+  push @val, $v;
+}
+
+ok(join(',', @key), 'xxx,baz,zoo,bar,foo');
+ok(join(',', @val), '5,4,3,2,6');
 
 $val = $h->delete('bar');
 ok($val, 2);
@@ -55,7 +82,15 @@ ok(not defined $val);
 $val = $h->delete('nokey');
 ok(not defined $val);
 
-$h->clear;
+eval {
+  $i = $h->reverse_iterator;
+  while (my($k,$v) = $i->prev) {
+    $h->clear;
+  }
+};
+
+ok($@ =~ /^invalid iterator access/);
+
 ok(scalar $h->keys, 0);
 ok(!$h->exists('zoo'));
 
