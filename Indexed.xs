@@ -242,6 +242,7 @@ enum store_mode {
   SM_SET,
   SM_PUSH,
   SM_UNSHIFT,
+  SM_GET_NUM
 };
 
 static void ixlink_insert(IxLink *root, IxLink *cur, enum store_mode mode)
@@ -253,10 +254,11 @@ static void ixlink_insert(IxLink *root, IxLink *cur, enum store_mode mode)
   }
 }
 
-static void ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode mode)
+static IxLink *ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode mode)
 {
   HE *he;
   SV *pair;
+  IxLink *cur;
 
   if ((he = hv_fetch_ent(THIS->hv, key, 1, 0)) == NULL)
   {
@@ -267,7 +269,6 @@ static void ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode mod
 
   if (SvTYPE(pair) == SVt_NULL)
   {
-    IxLink *cur;
     IxLink_new(cur);
 
     ixlink_insert(THIS->root, cur, mode);
@@ -275,20 +276,34 @@ static void ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode mod
     sv_setiv(pair, PTR2IV(cur));
 
     cur->key = newSVsv(key);
-    cur->val = newSVsv(value);
+
+    if (mode == SM_GET_NUM)
+    {
+      cur->val = newSViv(0);
+    }
+    else
+    {
+      assert(value);
+      cur->val = newSVsv(value);
+    }
   }
   else
   {
-    IxLink *cur = INT2PTR(IxLink *, SvIVX(pair));
+    cur = INT2PTR(IxLink *, SvIVX(pair));
 
-    if (mode != SM_SET)
+    if (mode != SM_GET_NUM)
     {
-      IxLink_extract(cur);
-      ixlink_insert(THIS->root, cur, mode);
-    }
+      if (mode != SM_SET)
+      {
+        IxLink_extract(cur);
+        ixlink_insert(THIS->root, cur, mode);
+      }
 
-    sv_setsv(cur->val, value);
+      sv_setsv(cur->val, value);
+    }
   }
+
+  return cur;
 }
 
 static void ixhv_clear(pTHX_ IXHV *THIS)
@@ -972,6 +987,60 @@ IXHV::iterator()
 
     ST(0) = sv_newmortal();
     sv_setref_pv(ST(0), "Tie::Hash::Indexed::Iterator", (void *) it);
+    XSRETURN(1);
+
+################################################################################
+#
+#   METHOD: preinc / postinc / predec / postdec
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::preinc(key)
+  SV *key
+
+  ALIAS:
+    predec = 1
+    postinc = 2
+    postdec = 3
+
+  PREINIT:
+    THI_METHOD(preinc);
+    IxLink *link;
+    SV *orig = NULL;
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+
+    link = ixhv_store(aTHX_ THIS, key, NULL, SM_GET_NUM);
+
+    if (ix >= 2 && GIMME_V != G_VOID)
+    {
+      orig = sv_mortalcopy(link->val);
+    }
+
+    switch (ix)
+    {
+      case 0:
+      case 2: sv_inc(link->val);
+              break;
+
+      case 1:
+      case 3: sv_dec(link->val);
+              break;
+    }
+
+    SvSETMAGIC(link->val);
+
+    if (GIMME_V == G_VOID)
+    {
+      XSRETURN(0);
+    }
+
+    ST(0) = orig ? orig : sv_mortalcopy(link->val);
     XSRETURN(1);
 
 ################################################################################

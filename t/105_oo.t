@@ -8,7 +8,7 @@
 
 use Test;
 
-BEGIN { plan tests => 57 };
+BEGIN { plan tests => 75 };
 
 use Tie::Hash::Indexed;
 ok(1);
@@ -133,3 +133,40 @@ ok(join(',', $h->items), "");
 
 ok(scalar $h->shift, undef);
 ok(join(',', $h->items), "");
+
+$h->set('foo', 2);
+ok($h->get('foo'), 2);
+
+$i = $h->preinc('foo');
+ok($h->get('foo'), 3);
+ok($i, 3);
+
+$i = $h->postinc('foo');
+ok($h->get('foo'), 4);
+ok($i, 3);
+
+$i = $h->postdec('foo');
+ok($h->get('foo'), 3);
+ok($i, 4);
+
+$i = $h->predec('foo');
+ok($h->get('foo'), 2);
+ok($i, 2);
+
+$i = $h->preinc('bar');
+ok($h->get('bar'), 1);
+ok($i, 1);
+
+$i = $h->postinc('xxx');
+ok($h->get('xxx'), 1);
+ok($i, 0);
+
+$i = $h->postdec('baz');
+ok($h->get('baz'), -1);
+ok($i, 0);
+
+$i = $h->predec('zoo');
+ok($h->get('zoo'), -1);
+ok($i, -1);
+
+ok(join(',', $h->keys), 'foo,bar,xxx,baz,zoo');
