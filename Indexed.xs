@@ -93,6 +93,14 @@
 
 #define THI_INVALIDATE_ITERATORS  ++SvIVX(THIS->serial)
 
+#if PERL_BCDVERSION < 0x5010000
+#  define HAS_OP_DOR 0
+#  define MY_OP_DOR OP_OR
+#else
+#  define HAS_OP_DOR 1
+#  define MY_OP_DOR OP_DOR
+#endif
+
 /*--------------------------------*/
 /* very simple doubly linked list */
 /*--------------------------------*/
@@ -242,6 +250,7 @@ enum store_mode {
   SM_SET,
   SM_PUSH,
   SM_UNSHIFT,
+  SM_GET,
   SM_GET_NUM
 };
 
@@ -283,6 +292,10 @@ static IxLink *ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode 
     }
     else
     {
+      if (mode == SM_GET && !value)
+      {
+        value = &PL_sv_undef;
+      }
       assert(value);
       cur->val = newSVsv(value);
     }
@@ -291,7 +304,7 @@ static IxLink *ixhv_store(pTHX_ IXHV *THIS, SV *key, SV *value, enum store_mode 
   {
     cur = INT2PTR(IxLink *, SvIVX(pair));
 
-    if (mode != SM_GET_NUM)
+    if (mode < SM_GET)
     {
       if (mode != SM_SET)
       {
@@ -1042,6 +1055,114 @@ IXHV::preinc(key)
 
     ST(0) = orig ? orig : sv_mortalcopy(link->val);
     XSRETURN(1);
+
+################################################################################
+#
+#   METHOD: add / subtract / multiply / divide / modulo / concat / ...
+#
+#   WRITTEN BY: Marcus Holland-Moritz             ON: May 2016
+#   CHANGED BY:                                   ON:
+#
+################################################################################
+
+void
+IXHV::add(key, val)
+  SV *key
+  SV *val
+
+  ALIAS:
+    subtract = 1
+    multiply = 2
+    divide = 3
+    modulo = 4
+    concat = 5
+    dor_assign = 6
+    or_assign = 7
+
+  PREINIT:
+    THI_METHOD(add);
+    IxLink *link;
+    static const int ops[] = {
+      OP_ADD,
+      OP_SUBTRACT,
+      OP_MULTIPLY,
+      OP_DIVIDE,
+      OP_MODULO,
+      OP_CONCAT,
+      MY_OP_DOR,
+      OP_OR
+    };
+
+  PPCODE:
+    THI_DEBUG_METHOD;
+
+    assert(ix < (int)(sizeof(ops)/sizeof(ops[0])));
+
+    link = ixhv_store(aTHX_ THIS, key, NULL, SM_GET);
+#if !HAS_OP_DOR
+    if (ix == 6)
+    {
+      if (!SvOK(link->val))
+      {
+        sv_setsv(link->val, val);
+        SvSETMAGIC(link->val);
+      }
+    }
+    else
+#endif
+    {
+      OP *oldop;
+      BINOP myop;
+
+      Zero(&myop, 1, struct op);
+      myop.op_flags = OPf_STACKED;
+      myop.op_type = ops[ix];
+
+      ENTER;
+      SAVETMPS;
+
+      PUSHMARK(SP);
+
+      if (myop.op_type == OP_OR || myop.op_type == MY_OP_DOR)
+      {
+        XPUSHs(val);
+        XPUSHs(link->val);
+      }
+      else
+      {
+        XPUSHs(link->val);
+        XPUSHs(val);
+      }
+
+      PUTBACK;
+
+      oldop = PL_op;
+      PL_op = (OP *) &myop;
+#if PERL_BCDVERSION < 0x5006000
+      PL_ppaddr[PL_op->op_type](ARGS);
+#else
+      PL_ppaddr[PL_op->op_type](aTHX);
+#endif
+      PL_op = oldop;
+
+      if (myop.op_type == OP_OR || myop.op_type == MY_OP_DOR)
+      {
+        SPAGAIN;
+        sv_setsv(link->val, TOPs);
+        SvSETMAGIC(link->val);
+      }
+
+      POPMARK;
+      FREETMPS;
+      LEAVE;
+    }
+
+    if (GIMME_V != G_VOID)
+    {
+      SPAGAIN;
+      ST(0) = sv_mortalcopy(link->val);
+      XSRETURN(1);
+    }
 
 ################################################################################
 #

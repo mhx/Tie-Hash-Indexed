@@ -8,7 +8,7 @@
 
 use Test;
 
-BEGIN { plan tests => 75 };
+BEGIN { plan tests => 90 };
 
 use Tie::Hash::Indexed;
 ok(1);
@@ -131,7 +131,7 @@ ok(join(',', $h->items), "xxx,5");
 ok(join(',', scalar $h->shift), "5");
 ok(join(',', $h->items), "");
 
-ok(scalar $h->shift, undef);
+ok(not defined scalar $h->shift);
 ok(join(',', $h->items), "");
 
 $h->set('foo', 2);
@@ -170,3 +170,27 @@ ok($h->get('zoo'), -1);
 ok($i, -1);
 
 ok(join(',', $h->keys), 'foo,bar,xxx,baz,zoo');
+
+ok($h->add('foo', 5), 7);
+ok($h->get('foo'), 7);
+
+ok($h->subtract('foo', 2), 5);
+ok($h->get('foo'), 5);
+
+ok($h->divide('foo', 2), 2.5);
+ok($h->get('foo'), 2.5);
+
+ok($h->multiply('foo', 4), 10);
+ok($h->get('foo'), 10);
+
+ok($h->modulo('foo', 4), 2);
+ok($h->get('foo'), 2);
+
+$h->set('foo', 0);
+ok($h->get('foo'), 0);
+ok($h->dor_assign('foo', 1), 0);
+ok($h->or_assign('foo', 1), 1);
+
+$h->set('foo', undef);
+ok(not defined $h->get('foo'));
+ok($h->dor_assign('foo', 0), 0);
