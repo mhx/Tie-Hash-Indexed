@@ -229,14 +229,8 @@ static void ixlink_insert(IxLink *root, IxLink *cur, enum store_mode mode)
 {
   switch (mode)
   {
-    case SM_SET:
-    case SM_PUSH:
-      IxLink_push(root, cur);
-      break;
-
-    case SM_UNSHIFT:
-      IxLink_unshift(root, cur);
-      break;
+    case SM_UNSHIFT: IxLink_unshift(root, cur); break;
+    default:         IxLink_push(root, cur);    break;
   }
 }
 
@@ -296,11 +290,23 @@ static void ixhv_clear(pTHX_ IXHV *THIS)
   hv_clear(THIS->hv);
 }
 
+static IxLink *ixhv_find(pTHX_ IXHV *THIS, SV *key)
+{
+  HE *he;
+
+  if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
+  {
+    return NULL;
+  }
+
+  return INT2PTR(IxLink *, SvIVX(HeVAL(he)));
+}
+
 /*===== XS FUNCTIONS =========================================================*/
 
 MODULE = Tie::Hash::Indexed    PACKAGE = Tie::Hash::Indexed
 
-PROTOTYPES: ENABLE
+PROTOTYPES: DISABLE
 
 ################################################################################
 #
@@ -315,6 +321,9 @@ IXHV *
 TIEHASH(CLASS, ...)
   char *CLASS
 
+  ALIAS:
+    new = 1
+
   PREINIT:
     THI_METHOD(TIEHASH);
     SV **cur;
@@ -322,6 +331,7 @@ TIEHASH(CLASS, ...)
 
   CODE:
     THI_DEBUG_METHOD;
+    (void) ix;
 
     if (items % 2 == 0)
     {
@@ -401,18 +411,17 @@ IXHV::FETCH(key)
 
   PREINIT:
     THI_METHOD(FETCH);
-    HE *he;
+    IxLink *link;
 
   PPCODE:
     THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
     THI_CHECK_OBJECT;
+    (void) ix;
 
-    if ((he = hv_fetch_ent(THIS->hv, key, 0, 0)) == NULL)
-    {
-      XSRETURN_UNDEF;
-    }
+    link = ixhv_find(aTHX_ THIS, key);
 
-    ST(0) = sv_mortalcopy((INT2PTR(IxLink *, SvIVX(HeVAL(he))))->val);
+    ST(0) = link == NULL ? &PL_sv_undef : sv_mortalcopy(link->val);
+
     XSRETURN(1);
 
 ################################################################################
@@ -439,6 +448,7 @@ IXHV::STORE(key, value)
     PUTBACK;
     THI_DEBUG_METHOD2("'%s', '%s'", SvPV_nolen(key), SvPV_nolen(value));
     THI_CHECK_OBJECT;
+    (void) ix;
 
     ixhv_store(aTHX_ THIS, key, value, SM_SET);
     return;
@@ -524,6 +534,7 @@ IXHV::EXISTS(key)
   PPCODE:
     THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
     THI_CHECK_OBJECT;
+    (void) ix;
 
     if (hv_exists_ent(THIS->hv, key, 0))
     {
@@ -560,6 +571,7 @@ IXHV::DELETE(key)
     PUTBACK;
     THI_DEBUG_METHOD1("'%s'", SvPV_nolen(key));
     THI_CHECK_OBJECT;
+    (void) ix;
 
     if ((sv = hv_delete_ent(THIS->hv, key, 0, 0)) == NULL)
     {
@@ -606,6 +618,7 @@ IXHV::CLEAR()
   PPCODE:
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
+    (void) ix;
 
     ixhv_clear(aTHX_ THIS);
 
@@ -665,8 +678,8 @@ IXHV::items(...)
 
   PREINIT:
     THI_METHOD(items);
-    STRLEN num_keys;
-    STRLEN num_items;
+    long num_keys;
+    long num_items;
 
   PPCODE:
     THI_DEBUG_METHOD;
@@ -857,7 +870,7 @@ IXHV::STORABLE_freeze(cloning)
     THI_METHOD(STORABLE_freeze);
     Serialized s;
     IxLink *cur;
-    STRLEN num_keys;
+    long num_keys;
 
   PPCODE:
     THI_DEBUG_METHOD1("%d", cloning);
@@ -911,7 +924,7 @@ STORABLE_thaw(object, cloning, serialized, ...)
     if (len < sizeof(SerialRev) ||
         strnNE(THI_SERIAL_ID, &ps->rev.id[0], 4))
       Perl_croak(aTHX_ "invalid frozen "
-                       XSCLASS " object (len=%d)", len);
+                       XSCLASS " object (len=%zu)", len);
 
     if (ps->rev.major != THI_SERIAL_REV_MAJOR)
       Perl_croak(aTHX_ "cannot thaw incompatible "
