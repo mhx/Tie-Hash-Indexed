@@ -755,7 +755,7 @@ IXHV::SCALAR()
   PPCODE:
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
-#ifdef hv_scalar
+#if defined(hv_scalar) && PERL_BCDVERSION < 0x5025003
     ST(0) = hv_scalar(THIS->hv);
 #else
     ST(0) = sv_newmortal();
