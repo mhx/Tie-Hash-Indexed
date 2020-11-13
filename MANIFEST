@@ -12,5 +12,8 @@ t/102_storable.t
 t/103_bugs.t
 t/104_utfhash.t
 t/105_oo.t
+t/106_magic.t
+t/801_pod.t
+t/802_pod_coverage.t
 TODO
 typemap
