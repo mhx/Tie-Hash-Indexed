@@ -1,4 +1,14 @@
 ----------------------------
+Version 0.05_04 (2020-11-13)
+----------------------------
+
+* Merge PR #3: fix for changed scalar(%hash) return signature
+
+* updated ppport.h to silence compiler warnings
+
+* added more tests
+
+----------------------------
 Version 0.05_03 (2016-05-15)
 ----------------------------
 
