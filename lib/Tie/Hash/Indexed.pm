@@ -14,7 +14,7 @@ use Tie::Hash;
 use vars qw($VERSION @ISA);
 
 @ISA = qw(DynaLoader Tie::Hash);
-$VERSION = '0.05_04';
+$VERSION = '0.06';
 
 bootstrap Tie::Hash::Indexed $VERSION;
 
