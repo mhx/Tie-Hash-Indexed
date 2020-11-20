@@ -1109,7 +1109,7 @@ IXHV::add(key, val)
 
     link = ixhv_store(aTHX_ THIS, key, NULL, SM_GET);
 #if !HAS_OP_DOR
-    if (ix == 6)
+    if (ix == 6 || ix == 7)
     {
       if (!SvOK(link->val))
       {
