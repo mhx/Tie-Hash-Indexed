@@ -801,7 +801,7 @@ IXHV::items(...)
     THI_DEBUG_METHOD;
     THI_CHECK_OBJECT;
 
-    num_keys = items > 1 ? (items - 1) : HvUSEDKEYS(THIS->hv);
+    num_keys = items > 1 ? (unsigned)(items - 1) : HvUSEDKEYS(THIS->hv);
     num_items = (ix == 0 ? 2 : 1)*num_keys;
 
     if (GIMME_V == G_SCALAR)
