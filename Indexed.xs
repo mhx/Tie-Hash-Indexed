@@ -556,11 +556,17 @@ IXHV::STORE(key, value)
 
     THI_INVALIDATE_ITERATORS;
 
+    bool has_rv = ix == 1 && GIMME_V != G_VOID;
+
+    if (has_rv)
+    {
+      ST(0) = sv_mortalcopy(value);
+    }
+
     ixhv_store(aTHX_ THIS, key, value, SM_SET);
 
-    if (ix == 1 && GIMME_V != G_VOID)
+    if (has_rv)
     {
-      ST(0) = value;
       XSRETURN(1);
     }
 
